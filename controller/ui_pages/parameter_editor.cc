@@ -112,7 +112,7 @@ uint8_t ParameterEditor::OnIncrement(int8_t increment) {
         parameter_index(active_control_),
         part_index(active_control_),
         instance_index(active_control_),
-        increment);
+        increment * ui.encoder_acceleration());
     edit_mode_ = EDIT_STARTED_BY_ENCODER;
   } else {
     int8_t new_control = active_control_ + increment;

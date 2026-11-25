@@ -57,6 +57,8 @@ static const prog_uint16_t units_definitions[UNIT_LAST] PROGMEM = {
   STR_RES_SWING,      // UNIT_GROOVE_TEMPLATE
   STR_RES_____,       // UNIT_MIDI_IN_MASK
   STR_RES_THRU,       // UNIT_MIDI_OUT_MODE
+  0,                  // UNIT_MIDI_CHANNEL
+  STR_RES_STCK,       // UNIT_SPREAD_MODE
 };
 
 static const prog_char note_names[] PROGMEM = " CC# DD# E FF# GG# AA# B";
@@ -122,19 +124,25 @@ uint8_t Parameter::Increment(
     int8_t increment) const {
   int16_t value = current_value;
   uint8_t new_value = current_value;
+  // YAM+: clamp to the range instead of ignoring an increment that
+  // overshoots, so that coarse (Shift x8) and accelerated encoder steps
+  // reach the end of the range.
+  int16_t min, max;
   if (unit == UNIT_INT8) {
     value = static_cast<int16_t>(static_cast<int8_t>(value));
-    value += increment;
-    if (value >= static_cast<int8_t>(min_value) &&
-        value <= static_cast<int8_t>(max_value)) {
-      new_value = static_cast<uint8_t>(value);
-    }
+    min = static_cast<int8_t>(min_value);
+    max = static_cast<int8_t>(max_value);
   } else {
-    value += increment;
-    if (value >= min_value && value <= max_value) {
-      new_value = static_cast<uint8_t>(value);
-    }
+    min = min_value;
+    max = max_value;
   }
+  value += increment;
+  if (value < min) {
+    value = min;
+  } else if (value > max) {
+    value = max;
+  }
+  new_value = static_cast<uint8_t>(value);
   return new_value;
 }
 
@@ -295,7 +303,7 @@ static const prog_char midi_cc_map[128] PROGMEM = {
    255, 255, 255, 255, 255, 255,  49,  50,
     51,  52,  53,  57,  73,  74,  75,  76,
    // 112-127
-    77,  78, 255, 255, 255, 255, 255, 255,
+    77,  78,  79, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };
 
@@ -337,7 +345,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
    254, 254, 254, 254, 254, 254, 254, 254,
    254, 254, 254, 254, 254, 254, 254, 254,
    // 192-207
-   255, 255, 255, 255, 255, 255, 255, 255,
+    79, 255, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255,
    // 208-223
    255, 255, 255, 255, 255, 255, 255, 255,
@@ -906,6 +914,13 @@ static const prog_Parameter parameters[kNumParameters] PROGMEM = {
     UNIT_UINT8, 0, 127,
     1, 0, 0xff, 113,
     STR_RES_VINT, STR_RES_VINTAGE, STR_RES_VOICE },
+  
+  // 79 (YAM+): how the part's spread detunes stacked/allocated voices.
+  { PARAMETER_LEVEL_PART,
+    PRM_PART_SPREAD_MODE,
+    UNIT_SPREAD_MODE, SPREAD_MODE_STACK, SPREAD_MODE_LAST - 1,
+    1, 0, 0xff, 114,
+    STR_RES_SPRM, STR_RES_SPREAD_MODE, STR_RES_PART },
 };
 
 /* static */

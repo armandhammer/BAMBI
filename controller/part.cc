@@ -125,8 +125,10 @@ static const prog_PartData init_part PROGMEM = {
   48 | 0x80, 100,
   48, 100,
   
+  // Spread mode (YAM+): new parts use centered spread.
+  SPREAD_MODE_CENTER,
+  
   // Padding
-  0,
   0,
   0,
   0,
@@ -633,6 +635,34 @@ void Part::Stop() {
 
 
 
+// Detune of voice "index" out of "count" stacked/allocated voices (YAM+).
+// SPREAD_MODE_STACK reproduces YAM: index * spread, so the stack drifts
+// sharp as voices are added. CENTER spreads the voices symmetrically around
+// the played pitch; WIDE does the same with inner voices closer to the center
+// and outer voices at the same extremes (supersaw-style).
+uint16_t Part::SpreadNote(
+    uint16_t note,
+    uint8_t index,
+    uint8_t count) const {
+  uint8_t spread = data_.spread;
+  int16_t offset;
+  if (data_.spread_mode == SPREAD_MODE_STACK) {
+    offset = U8U8Mul(index, spread);
+  } else if (count < 2) {
+    offset = 0;
+  } else {
+    // Position in half-voice units: -(count - 1) .. +(count - 1).
+    int8_t position = (index << 1) - (count - 1);
+    offset = static_cast<int16_t>(position) * spread;
+    if (data_.spread_mode == SPREAD_MODE_WIDE) {
+      offset = offset * (position < 0 ? -position : position) / (count - 1);
+    }
+    offset /= 2;
+  }
+  int16_t result = static_cast<int16_t>(note) + offset;
+  return result < 0 ? 0 : result;
+}
+
 uint16_t Part::TuneNote(uint8_t midi_note) const {
   int16_t n = Clip(
       static_cast<int16_t>(midi_note) + S8U8Mul(data_.octave, 12), 0, 127);
@@ -671,14 +701,12 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
     mono_allocator_.NoteOn(note, velocity);
     uint16_t tuned_note = TuneNote(note);
     uint8_t legato = mono_allocator_.size() > 1;
-    uint8_t pitch_drift = 0;
     for (uint8_t i = 0; i < num_allocated_voices_; ++i) {
       voicecard_tx.Trigger(
           allocated_voices_[i],
-          tuned_note + pitch_drift,
+          SpreadNote(tuned_note, i, num_allocated_voices_),
           velocity,
           legato);
-      pitch_drift += data_.spread;
     }
     retrigger_lfos = !legato || !data_.legato;
   } else {
@@ -693,12 +721,12 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
         uint16_t tuned_note = TuneNote(note);
         voicecard_tx.Trigger(
             allocated_voices_[voice_index],
-            tuned_note,
+            SpreadNote(tuned_note, 0, 2),
             velocity,
             0);
         voicecard_tx.Trigger(
             allocated_voices_[GetNextVoice(voice_index)],
-            tuned_note + data_.spread,
+            SpreadNote(tuned_note, 1, 2),
             velocity,
             0);
         retrigger_lfos = 1;
@@ -708,7 +736,7 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
         uint16_t tuned_note = TuneNote(note);
         voicecard_tx.Trigger(
             allocated_voices_[voice_index],
-            tuned_note + voice_index * data_.spread,
+            SpreadNote(tuned_note, voice_index, poly_allocator_.size() >> 1),
             velocity,
             0);
       } else {
@@ -720,7 +748,7 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
         uint16_t tuned_note = TuneNote(note);
         voicecard_tx.Trigger(
             allocated_voices_[voice_index],
-            tuned_note + voice_index * data_.spread,
+            SpreadNote(tuned_note, voice_index, poly_allocator_.size()),
             velocity,
             0);
         retrigger_lfos = 1;
@@ -755,14 +783,12 @@ void Part::InternalNoteOff(uint8_t note) {
       // are still pressed. Retrigger the most recent of them.
       if (top_note == note) {
         uint16_t tuned_note = TuneNote(mono_allocator_.most_recent_note().note);
-        uint8_t pitch_drift = 0;
         for (uint8_t i = 0; i < num_allocated_voices_; ++i) {
           voicecard_tx.Trigger(
               allocated_voices_[i],
-              tuned_note + pitch_drift,
+              SpreadNote(tuned_note, i, num_allocated_voices_),
               mono_allocator_.most_recent_note().velocity & 0x7f,
               1);
-          pitch_drift += data_.spread;
         }
         retrigger_lfos = !data_.legato;
       }

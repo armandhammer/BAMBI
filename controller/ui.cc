@@ -68,7 +68,7 @@ const prog_PageInfo page_registry[] PROGMEM = {
   
   { PAGE_VOICE_LFO,
     &ParameterEditor::event_handlers_,
-    { 0xff, 32, 33, 0xff, 75, 76, 77, 78 },
+    { 0xff, 32, 33, 79, 75, 76, 77, 78 },
     PAGE_ENV_LFO, 2, 0x0f,
   },
   
@@ -161,6 +161,12 @@ static const prog_uint8_t default_most_recent_page_in_group[9] PROGMEM = {
 UiPageNumber Ui::active_page_;
 UiPageNumber Ui::most_recent_non_system_page_;
 uint8_t Ui::cycle_;
+
+/* static */
+uint8_t Ui::encoder_idle_ticks_;
+
+/* static */
+uint8_t Ui::encoder_acceleration_ = 1;
 uint8_t Ui::inhibit_switch_;
 Encoder Ui::encoder_;
 Switches Ui::switches_;
@@ -203,6 +209,9 @@ void Ui::Init() {
 /* static */
 void Ui::Poll() {
   ++cycle_;
+  if (encoder_idle_ticks_ != 0xff) {
+    ++encoder_idle_ticks_;
+  }
   // I
   int8_t increment = encoder_.Read();
   if (increment != 0) {
@@ -215,6 +224,15 @@ void Ui::Poll() {
       ++control_id;
       inhibit_switch_ = 0x80;
     }
+    // YAM+ encoder acceleration: detents less than 12.5 ms apart count x4,
+    // less than 25 ms apart x2 (Poll runs at 4.88 kHz). The factor rides in
+    // bits 1-2 of the control id and only applies to value edits.
+    if (encoder_idle_ticks_ < 61) {
+      control_id |= 4;
+    } else if (encoder_idle_ticks_ < 122) {
+      control_id |= 2;
+    }
+    encoder_idle_ticks_ = 0;
     queue_.AddEvent(CONTROL_ENCODER, control_id, increment);
   }
   if (encoder_.clicked()) {
@@ -313,7 +331,9 @@ void Ui::DoEvents() {
         break;
         
       case CONTROL_ENCODER:
-        if (e.control_id == 0) {
+        if ((e.control_id & 1) == 0) {
+          encoder_acceleration_ = (e.control_id & 4) ? 4 :
+              ((e.control_id & 2) ? 2 : 1);
           (*event_handlers_.OnIncrement)(e.value);
         } else {
           int8_t new_part = state_.active_part + e.value;

@@ -44,6 +44,11 @@ env3 curve
 vint
 vintage
 voice
+sprm
+spread mode
+stck
+cntr
+wide
 attack
 decay
 sustain

@@ -49,6 +49,11 @@ static const prog_char str_res_env3_curve[] PROGMEM = "env3 curve";
 static const prog_char str_res_vint[] PROGMEM = "vint";
 static const prog_char str_res_vintage[] PROGMEM = "vintage";
 static const prog_char str_res_voice[] PROGMEM = "voice";
+static const prog_char str_res_sprm[] PROGMEM = "sprm";
+static const prog_char str_res_spread_mode[] PROGMEM = "spread mode";
+static const prog_char str_res_stck[] PROGMEM = "stck";
+static const prog_char str_res_cntr[] PROGMEM = "cntr";
+static const prog_char str_res_wide[] PROGMEM = "wide";
 static const prog_char str_res_attack[] PROGMEM = "attack";
 static const prog_char str_res_decay[] PROGMEM = "decay";
 static const prog_char str_res_sustain[] PROGMEM = "sustain";
@@ -417,6 +422,11 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_vint,
   str_res_vintage,
   str_res_voice,
+  str_res_sprm,
+  str_res_spread_mode,
+  str_res_stck,
+  str_res_cntr,
+  str_res_wide,
   str_res_attack,
   str_res_decay,
   str_res_sustain,

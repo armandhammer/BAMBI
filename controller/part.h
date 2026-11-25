@@ -109,8 +109,11 @@ struct PartData {
   // 32..63: (note value | 0x80 if gate), (note velocity | 0x80 if legato)
   uint8_t sequence_data[64];
   
-  // Offset: 80-84
-  uint8_t padding[4];
+  // Offset: 80 (YAM+): SpreadMode, how "spread" detunes stacked voices.
+  uint8_t spread_mode;
+  
+  // Offset: 81-84
+  uint8_t padding[3];
   
   uint8_t step_value(uint8_t sequence, uint8_t step) const {
     return sequence_data[(step + (sequence << 4)) & 0x1f];
@@ -189,7 +192,17 @@ enum PartParameter {
   PRM_PART_SEQUENCE_LENGTH_1,
   PRM_PART_SEQUENCE_LENGTH_2,
   PRM_PART_SEQUENCE_LENGTH_3,
-  PRM_PART_POLYPHONY_MODE
+  PRM_PART_POLYPHONY_MODE,
+  
+  // YAM+
+  PRM_PART_SPREAD_MODE = sizeof(Patch) + 80
+};
+
+enum SpreadMode {
+  SPREAD_MODE_STACK,
+  SPREAD_MODE_CENTER,
+  SPREAD_MODE_WIDE,
+  SPREAD_MODE_LAST
 };
 
 class Part {
@@ -286,6 +299,7 @@ class Part {
   // scale/raga.
   uint8_t AcceptNote(uint8_t note) const;
   uint16_t TuneNote(uint8_t midi_note) const;
+  uint16_t SpreadNote(uint16_t note, uint8_t index, uint8_t count) const;
 
   void InternalNoteOn(uint8_t note, uint8_t velocity);
   void InternalNoteOff(uint8_t note);

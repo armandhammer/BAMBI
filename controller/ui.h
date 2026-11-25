@@ -201,11 +201,17 @@ class Ui {
   
   static uint8_t shifted() { return switches_.low(7); }
   
+  // YAM+: multiplier (1, 2 or 4) from the speed of the encoder event being
+  // processed, for parameter value edits.
+  static uint8_t encoder_acceleration() { return encoder_acceleration_; }
+  
  private:
   static UiPageNumber active_page_;
   static UiPageNumber most_recent_non_system_page_;
    
   static uint8_t cycle_;
+  static uint8_t encoder_idle_ticks_;
+  static uint8_t encoder_acceleration_;
   static Encoder encoder_;
   static Switches switches_;
   static uint8_t inhibit_switch_;
