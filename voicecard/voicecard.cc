@@ -23,6 +23,7 @@
 #include "avrlib/parallel_io.h"
 #include "avrlib/timer.h"
 
+#include "common/atomic.h"
 #include "voicecard/audio_out.h"
 #include "voicecard/leds.h"
 #include "voicecard/load_probe.h"
@@ -47,30 +48,116 @@ Gpio<PortB, 0> log_vca;
 
 UartSpiMaster<UartSpiPort0, Gpio<PortD, 2>, 2> dac_interface;
 
-static uint8_t update_vca;
 static const uint8_t dac_scale = 16;
+
+// -----------------------------------------------------------------------------
+// YAM+ control-voltage smoothing.
+//
+// The voice computes cutoff, resonance and VCA once per block (40 samples,
+// ~980 Hz). Writing them as steps zippers slow sweeps (8-bit cutoff PWM) and
+// stair-steps fast envelopes. Instead, the main loop hands each new block
+// value to the ISR, which ramps to it linearly in kCvRampSteps steps, one
+// every kCvDecimation samples (~9.8 kHz), i.e. over 32 samples (< 1 block):
+// - cutoff and resonance: 8.8 fixed point. The cutoff PWM duty is dithered
+//   with first-order error feedback every sample, so the CV low-pass on the
+//   voicecard averages it to sub-LSB resolution.
+// - VCA: 12-bit DAC value (after linearization), written at every ramp step,
+//   plus once per block when it doesn't change (like YAM).
+// Unchanged values don't start a ramp, so a static voice costs only the
+// divider and the dither in the ISR.
+// -----------------------------------------------------------------------------
+
+#ifndef CV_DECIMATION
+#define CV_DECIMATION 4  // 1, 2, 4 or 8.
+#endif
+
+static const uint8_t kCvDecimation = CV_DECIMATION;
+static const uint8_t kCvRampSamples = 32;
+static const uint8_t kCvRampSteps = kCvRampSamples / kCvDecimation;
+
+struct CvRamp {
+  uint16_t value;  // Current value (ISR).
+  uint16_t target;  // End of the ramp (written by the main loop).
+  int16_t step;
+};
+
+static CvRamp cutoff_ramp;
+static CvRamp resonance_ramp;
+static CvRamp vca_ramp = { 4095, 4095, 0 };  // Init() sets the DAC to 4095.
+static uint8_t filter_ramp_steps;  // Filter CV ramp steps left.
+static uint8_t vca_ramp_steps;  // VCA ramp steps (DAC writes) left.
+
+static inline int16_t RampStep(uint16_t from, uint16_t to) {
+  return (static_cast<int32_t>(to) - static_cast<int32_t>(from)) /
+      kCvRampSteps;
+}
+
+// Called by the main loop after each block. The previous target is used as
+// the start of the new ramp (the ISR finishes each ramp before the next block
+// in steady state), so no ISR state has to be read here.
+static inline void StartCvRamps(
+    uint16_t cutoff,
+    uint16_t resonance,
+    uint16_t vca) {
+  uint8_t filter_changed = cutoff != cutoff_ramp.target ||
+      resonance != resonance_ramp.target;
+  int16_t cutoff_step = RampStep(cutoff_ramp.target, cutoff);
+  int16_t resonance_step = RampStep(resonance_ramp.target, resonance);
+  uint8_t vca_steps = kCvRampSteps;
+  int16_t vca_step = RampStep(vca_ramp.target, vca);
+  if (vca == vca_ramp.target) {
+    vca_steps = 1;  // Refresh the DAC once per block, like YAM.
+  }
+  uint8_t sreg = InterruptsOff();
+  if (filter_changed) {
+    cutoff_ramp.target = cutoff;
+    cutoff_ramp.step = cutoff_step;
+    resonance_ramp.target = resonance;
+    resonance_ramp.step = resonance_step;
+    filter_ramp_steps = kCvRampSteps;
+  }
+  vca_ramp.target = vca;
+  vca_ramp.step = vca_step;
+  vca_ramp_steps = vca_steps;
+  InterruptsRestore(sreg);
+}
+
+static inline void AdvanceRamp(CvRamp* ramp, uint8_t last) {
+  ramp->value = last ? ramp->target : ramp->value + ramp->step;
+}
 
 ISR(TIMER2_OVF_vect) {
   static uint8_t sample_counter = 0;
-  static Word vca_12bits;
+  static uint8_t cv_divider = 0;
+  static uint8_t cutoff_dither = 0;
   
-  if (update_vca) {
-    dac_interface.Strobe();
-    update_vca = 0;
-    dac_interface.Overwrite(vca_12bits.bytes[1]);
-    dac_interface.Overwrite(vca_12bits.bytes[0]);
-    dac_interface.Wait();
-    uint16_t next_vca_value;
-    if (log_vca.is_low()) {
-      next_vca_value = ambika::ResourcesManager::Lookup<uint16_t, uint8_t>(
-          lut_res_vca_linearization,
-          voice.vca());
-    } else {
-      next_vca_value = voice.vca() * dac_scale;
+  if (++cv_divider >= kCvDecimation) {
+    cv_divider = 0;
+    uint8_t steps = filter_ramp_steps;
+    if (steps) {
+      filter_ramp_steps = --steps;
+      AdvanceRamp(&cutoff_ramp, steps == 0);
+      AdvanceRamp(&resonance_ramp, steps == 0);
+      vcf_resonance_out.Write(resonance_ramp.value >> 8);
     }
-    vca_12bits.value = next_vca_value | 0x1000;
+    steps = vca_ramp_steps;
+    if (steps) {
+      vca_ramp_steps = --steps;
+      AdvanceRamp(&vca_ramp, steps == 0);
+      Word vca_12bits;
+      vca_12bits.value = vca_ramp.value | 0x1000;
+      dac_interface.Strobe();
+      dac_interface.Overwrite(vca_12bits.bytes[1]);
+      dac_interface.Overwrite(vca_12bits.bytes[0]);
+      dac_interface.Wait();
+    }
   }
   
+  Word cutoff;
+  cutoff.value = cutoff_ramp.value + cutoff_dither;
+  cutoff_dither = cutoff.bytes[0];
+  vcf_cutoff_out.Write(cutoff.bytes[1]);
+
   if (!audio_buffer.readable() && LoadProbe::underruns != 255) {
     ++LoadProbe::underruns;
   }
@@ -144,10 +231,16 @@ int main(void) {
       uint8_t queued = audio_buffer.readable();
       voicecard_rx.TickRxLed();
       voice.ProcessBlock();
-      vcf_cutoff_out.Write(voice.cutoff());
-      vcf_resonance_out.Write(voice.resonance());
+      uint16_t vca;
+      if (log_vca.is_low()) {
+        vca = ambika::ResourcesManager::Lookup<uint16_t, uint8_t>(
+            lut_res_vca_linearization,
+            voice.vca());
+      } else {
+        vca = voice.vca() * dac_scale;
+      }
+      StartCvRamps(voice.cutoff_cv(), voice.resonance_cv(), vca);
       vcf_mode.Write(filter_mode_bytes[voice.patch().filter[0].mode]);
-      update_vca = 1;
       // Samples played by the ISR while this block was computed.
       uint8_t played = queued + kAudioBlockSize - audio_buffer.readable();
       if (!load_probe_armed) {

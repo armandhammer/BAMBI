@@ -53,6 +53,13 @@ int16_t Voice::pitch_value_;
 uint8_t Voice::modulation_sources_[kNumModulationSources];
 int8_t Voice::modulation_destinations_[kNumModulationDestinations];
 int16_t Voice::dst_[kNumModulationDestinations];
+uint16_t Voice::cutoff_cv_;
+uint16_t Voice::resonance_cv_;
+
+// 14-bit CV (0..16383) to 8.8 PWM value, clipped at 0xff00.
+static inline uint16_t U14ToPwmCv(uint16_t value) {
+  return value >= (0xff00 >> 2) ? 0xff00 : value << 2;
+}
 uint8_t Voice::buffer_[kAudioBlockSize];
 uint8_t Voice::osc2_buffer_[kAudioBlockSize];
 uint8_t Voice::sync_state_[kAudioBlockSize];
@@ -327,12 +334,14 @@ inline void Voice::UpdateDestinations() {
   // Store in memory all the updated parameters.
   modulation_destinations_[MOD_DST_FILTER_CUTOFF] = U14ShiftRight6(cutoff);
 #ifdef POLIVOKS_FILTERBOARD
-  modulation_destinations_[MOD_DST_FILTER_RESONANCE] = U14ShiftRight6(16383-
-      dst_[MOD_DST_FILTER_RESONANCE]);
+  uint16_t resonance = 16383 - dst_[MOD_DST_FILTER_RESONANCE];
 #else
-  modulation_destinations_[MOD_DST_FILTER_RESONANCE] = U14ShiftRight6(
-      dst_[MOD_DST_FILTER_RESONANCE]);
+  uint16_t resonance = dst_[MOD_DST_FILTER_RESONANCE];
 #endif
+  modulation_destinations_[MOD_DST_FILTER_RESONANCE] = U14ShiftRight6(
+      resonance);
+  cutoff_cv_ = U14ToPwmCv(cutoff);
+  resonance_cv_ = U14ToPwmCv(resonance);
   modulation_destinations_[MOD_DST_MIX_CRUSH] = (
       dst_[MOD_DST_MIX_CRUSH] >> 8) + 1;
 

@@ -70,6 +70,11 @@ class Voice {
   static inline uint8_t resonance()  {
     return modulation_destinations_[MOD_DST_FILTER_RESONANCE];
   }
+  // Full-resolution filter CVs for the smoothed PWM outputs (YAM+): 8.8
+  // fixed point, high byte = PWM duty, clipped to 0xff00 so that adding the
+  // 8-bit dither error can't overflow.
+  static inline uint16_t cutoff_cv()  { return cutoff_cv_; }
+  static inline uint16_t resonance_cv()  { return resonance_cv_; }
   static inline uint8_t modulation_source(uint8_t i) {
     return modulation_sources_[i];
   }
@@ -116,6 +121,8 @@ class Voice {
   static uint8_t modulation_sources_[kNumModulationSources];
   static int8_t modulation_destinations_[kNumModulationDestinations];
   static int16_t dst_[kNumModulationDestinations];
+  static uint16_t cutoff_cv_;
+  static uint16_t resonance_cv_;
 
   // Counters/phases for the pitch envelope generator (portamento).
   // Pitches are stored on 14 bits, the 7 highest bits are the MIDI note value,
