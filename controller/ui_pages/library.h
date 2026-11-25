@@ -55,6 +55,11 @@ class Library : public UiPage {
     name_dirty_ = 1;
   }
   static StorageLocation* mutable_location() { return &location_; }
+  // YAM+: bank/slot (bank << 8 | slot) of the last object loaded or saved,
+  // indexed by StorageLocation::index().
+  static const uint16_t* loaded_objects_indices() {
+    return loaded_objects_indices_;
+  }
   static const StorageLocation& location() { return location_; }
 
   static void PrintActiveObjectName(char* buffer);

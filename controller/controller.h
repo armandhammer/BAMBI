@@ -36,6 +36,15 @@ const uint8_t kNumVoices = 6;
 
 const uint8_t kSystemVersion = 0x10;
 
+// YAM+ release, reported by the version SysEx request (0x1c): major in the
+// high nibble, minor in the low nibble.
+const uint8_t kYamPlusVersion = 0x01;
+
+// Layout revisions of the patch and part data, reported by the version
+// request. 1 = YAM+ additions (patch bytes 106-109, part byte 80).
+const uint8_t kPatchLayoutVersion = 1;
+const uint8_t kPartLayoutVersion = 1;
+
 }  // namespace ambika
 
 #endif  // CONTROLLER_CONTROLLER_H_

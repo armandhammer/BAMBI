@@ -199,6 +199,8 @@ class Storage {
   
   static void ReadObject(const StorageLocation& location);
   static void SysExSendObject(const StorageLocation& location);
+  static void SysExSendName(uint8_t part, uint8_t object);
+  static void SysExSendVersion();
   static void SysExSendRaw(uint8_t, uint8_t, const uint8_t*, uint8_t, bool);
   static void RIFFWriteObject(const StorageLocation& location);
   static void TouchObject(const StorageLocation& location);

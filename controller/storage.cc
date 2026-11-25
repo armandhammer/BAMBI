@@ -29,6 +29,8 @@
 #include "controller/multi.h"
 #include "controller/system_settings.h"
 #include "controller/ui.h"
+#include "controller/ui_pages/library.h"
+#include "controller/voicecard_tx.h"
 
 namespace ambika {
 
@@ -336,12 +338,80 @@ void Storage::TouchObject(const StorageLocation& location) {
 
 /* static */
 void Storage::SysExSendObject(const StorageLocation& location) {
+  // YAM+: a single object (not part of a multi dump, where alias is 1-6)
+  // carries its part number (1-6) as argument, so that a reply to a request
+  // can be attributed. YAM sent 0.
+  uint8_t argument = location.alias;
+  if (!argument && location.object != STORAGE_OBJECT_MULTI) {
+    argument = location.part + 1;
+  }
   SysExSendRaw(
       location.object + 1,
-      location.alias,
+      argument,
       object_data(location),
       object_size(location),
       false);
+}
+
+/* static */
+void Storage::SysExSendName(uint8_t part, uint8_t object) {
+  // YAM+ reply 0x06 to a name request (0x16). Payload (20 bytes):
+  // object, bank, slot, status (0 = ok, else FilesystemStatus), name[16].
+  // bank/slot are those of the last object of this type loaded or saved on
+  // this part (A/000 after boot). The name is read from the SD card.
+  if (object > STORAGE_OBJECT_MULTI || part >= kNumVoices) {
+    return;
+  }
+  StorageLocation location;
+  location.object = static_cast<StorageObject>(object);
+  location.part = part;
+  location.alias = 0;
+  uint16_t bank_slot = Library::loaded_objects_indices()[location.index()];
+  location.bank = bank_slot >> 8;
+  location.slot = bank_slot & 0xff;
+  // tmp_buffer_[0..35] holds the file name during Load().
+  uint8_t* reply = reinterpret_cast<uint8_t*>(tmp_buffer_ + 36);
+  char* name = tmp_buffer_ + 40;
+  memset(name, ' ', 16);
+  location.name = name;
+  FilesystemStatus status = Load(STORAGE_BANK, location, 0);
+  reply[0] = object;
+  reply[1] = location.bank;
+  reply[2] = location.slot;
+  reply[3] = status;
+  for (uint8_t i = 0; i < 16; ++i) {
+    // Keep the payload printable.
+    if (name[i] < 32 || name[i] > 126) {
+      name[i] = ' ';
+    }
+  }
+  SysExSendRaw(
+      0x06,
+      object == STORAGE_OBJECT_MULTI ? 0 : part + 1,
+      reply,
+      20,
+      false);
+}
+
+/* static */
+void Storage::SysExSendVersion() {
+  // YAM+ reply 0x0c to a version request (0x1c). Payload (18 bytes):
+  // family (1 = YAM+), controller version, YAM+ version, number of
+  // oscillator shapes, patch layout, part layout, then for each voicecard
+  // port 1-6: slave id (0 or 0xff = absent), firmware version.
+  uint8_t* reply = reinterpret_cast<uint8_t*>(tmp_buffer_);
+  reply[0] = 1;
+  reply[1] = kSystemVersion;
+  reply[2] = kYamPlusVersion;
+  reply[3] = WAVEFORM_LAST;
+  reply[4] = kPatchLayoutVersion;
+  reply[5] = kPartLayoutVersion;
+  for (uint8_t i = 0; i < kNumVoices; ++i) {
+    Word version = voicecard_tx.GetVersion(i);
+    reply[6 + 2 * i] = version.bytes[0];
+    reply[7 + 2 * i] = version.bytes[1];
+  }
+  SysExSendRaw(0x0c, 0, reply, 6 + 2 * kNumVoices, false);
 }
 
 /* static */
@@ -702,6 +772,17 @@ void Storage::SysExParseCommand() {
       sysex_rx_expected_size_ = 2;
       break;
     
+    case 0x16:
+      // YAM+ name request: 1 byte (object type).
+      sysex_rx_expected_size_ = 1;
+      break;
+      
+    case 0x1a:
+    case 0x1c:
+      // YAM+ current locations / version requests have no data.
+      sysex_rx_expected_size_ = 0;
+      break;
+    
     default:
       sysex_rx_state_ = RECEIVING_FOOTER;
       break;
@@ -747,6 +828,26 @@ void Storage::SysExAcceptCommand() {
     case 0x15:
       location.object = static_cast<StorageObject>(sysex_rx_command_[0] - 0x11);
       SysExSend(location);
+      break;
+      
+    case 0x16:
+      SysExSendName(location.part, buffer_[0]);
+      break;
+      
+    case 0x1a:
+      // YAM+ current locations: 19 little-endian words (bank << 8 | slot),
+      // indexed by StorageLocation::index(): part * 3 + {patch, sequence,
+      // program}, then the multi.
+      SysExSendRaw(
+          0x0a,
+          0,
+          reinterpret_cast<const uint8_t*>(Library::loaded_objects_indices()),
+          (kNumVoices * 3 + 1) * sizeof(uint16_t),
+          false);
+      break;
+      
+    case 0x1c:
+      SysExSendVersion();
       break;
       
     case 0x1f:
