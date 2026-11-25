@@ -30,3 +30,6 @@
 
 # OS X crap
 .DS_Stor?
+
+# YAM+ / BAMBI release folders
+/release

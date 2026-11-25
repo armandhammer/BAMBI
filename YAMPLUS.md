@@ -80,8 +80,7 @@ payload (checksum `00 00`) unless noted.
 | `0x1a` current locations | `0x0a` | 19 little-endian words `bank << 8 \| slot`: part × 3 + {patch, sequence, program}, then multi |
 | `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version, oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
 
-`tools/yamplus_sysex.py` in the YAM+ workspace exercises these from a
-computer.
+`utils/yamplus_sysex.py` exercises these from a computer.
 
 ### Voicecard bus additions (controller ↔ voicecard)
 `0x9n` set voice index *n*, `0xf6` clear load probe, `0xf7` get underruns,
@@ -100,6 +99,5 @@ computer.
 ## Building
 
 Use avr-gcc 4.3.5 / avr-libc 1.6.8: newer compilers miscompile the
-oscillator code. The YAM+ workspace has a pinned Docker toolchain
-(`toolchain/avr-make.sh`) that reproduces the shipped YAM190319 voicecard
-byte for byte.
+oscillator code. `toolchain/` has a pinned Docker toolchain that
+reproduces the shipped YAM190319 voicecard byte for byte; see README.md.

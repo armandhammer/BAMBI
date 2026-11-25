@@ -1,0 +1,45 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # avr-gcc 4.3.5 / avr-libc 1.6.8 (Debian Squeeze i386, digest-pinned):
+      # newer compilers miscompile the oscillator code.
+      - name: Build toolchain image
+        run: >
+          docker build --platform linux/386 -t ambika-squeeze:4.3.5
+          -f toolchain/Dockerfile.squeeze-i386 toolchain
+
+      - name: Check generated resources
+        run: |
+          bash toolchain/avr-resources.sh . controller/makefile check
+          bash toolchain/avr-resources.sh . voicecard/makefile check
+
+      - name: Build controller
+        run: bash toolchain/avr-make.sh . controller/makefile bin
+
+      - name: Build voicecard
+        run: bash toolchain/avr-make.sh . voicecard/makefile bin
+
+      - name: Size gates
+        run: bash toolchain/size-report.sh . | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Package SD-card files
+        run: bash toolchain/package-release.sh ci
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bambi-sd-card
+          path: |
+            release/ci/*.BIN
+            YAMPLUS.md

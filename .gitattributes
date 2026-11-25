@@ -1,0 +1,7 @@
+* text=auto
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.bin binary
+*.BIN binary
+*.hex binary
+*.syx binary
