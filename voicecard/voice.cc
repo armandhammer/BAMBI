@@ -60,6 +60,59 @@ uint16_t Voice::resonance_cv_;
 static inline uint16_t U14ToPwmCv(uint16_t value) {
   return value >= (0xff00 >> 2) ? 0xff00 : value << 2;
 }
+
+// -----------------------------------------------------------------------------
+// YAM+ vintage: per-voice analog variance, scaled by patch_.vintage.
+//
+// - Static "component tolerance" offsets, picked by the voice index the
+//   controller assigns to each voicecard slot: at vintage = 127, pitch up to
+//   +/-9 cents, cutoff up to +/-3 steps (of 128), envelope times up to
+//   +/-3 steps.
+// - Slow drift: a per-voice random walk (new target every 256 blocks, i.e.
+//   ~260 ms, smoothed with a ~130 ms time constant) adds up to +/-6 cents and
+//   +/-2 cutoff steps.
+// The drift uses its own generator seeded by the voice index, so voices
+// wander independently and the shared Random state (noise, random mod
+// source) is untouched. vintage = 0 leaves everything as stock YAM.
+// -----------------------------------------------------------------------------
+
+static const prog_int8_t kVintageOffsets[8 * 3] PROGMEM = {
+  // pitch (1/128 st), cutoff (x32 CV units), envelope time (steps x2)
+    9,  -40,   1,
+   -7,   65,  -1,
+    3,  -90,   2,
+  -11,   25,   0,
+   12,   80,  -2,
+   -4,  -60,   1,
+    6,  100,  -1,
+   -9,  -15,   2,
+};
+
+static uint8_t voice_index;
+static uint16_t drift_rng = 0xace1;
+static int8_t drift_target;
+static uint8_t drift_counter;
+static int16_t drift;  // Smoothed drift, target << 6.
+static int16_t vintage_pitch;  // Applied in RenderOscillators().
+
+/* static */
+void Voice::set_voice_index(uint8_t index) {
+  voice_index = index;
+  drift_rng = 0xace1 ^ U8U8Mul(index + 1, 0x3b);
+}
+
+static inline void UpdateDrift() {
+  if (++drift_counter == 0) {
+    // xorshift16.
+    uint16_t x = drift_rng;
+    x ^= x << 7;
+    x ^= x >> 9;
+    x ^= x << 8;
+    drift_rng = x;
+    drift_target = static_cast<int8_t>(x >> 8);
+  }
+  drift += ((static_cast<int16_t>(drift_target) << 6) - drift) >> 7;
+}
 uint8_t Voice::buffer_[kAudioBlockSize];
 uint8_t Voice::osc2_buffer_[kAudioBlockSize];
 uint8_t Voice::sync_state_[kAudioBlockSize];
@@ -316,6 +369,22 @@ inline void Voice::ProcessModulationMatrix() {
 
 /* static */
 inline void Voice::UpdateDestinations() {
+  // YAM+ vintage offsets (see kVintageOffsets).
+  int16_t vintage_cutoff = 0;
+  int8_t vintage_env = 0;
+  vintage_pitch = 0;
+  uint8_t vintage = patch_.vintage;
+  if (vintage) {
+    const prog_int8_t* offsets = kVintageOffsets + (voice_index & 7) * 3;
+    UpdateDrift();
+    int8_t wander = drift >> 6;
+    vintage_pitch = (S8U8Mul(pgm_read_byte(offsets), vintage) >> 7) +
+        (S8U8Mul(wander, vintage) >> 11);
+    vintage_cutoff = (S8U8Mul(pgm_read_byte(offsets + 1), vintage) >> 5) +
+        (S8U8Mul(wander, vintage) >> 6);
+    vintage_env = S8U8Mul(pgm_read_byte(offsets + 2), vintage) >> 6;
+  }
+
   // Hardcoded filter modulations.
   // By default, the resonance tracks the note. Tracking works best when the
   // transistors are thermically coupled. You can disable tracking by applying
@@ -330,7 +399,8 @@ inline void Voice::UpdateDestinations() {
     modulation_sources_[MOD_SRC_VELOCITY])); // velocity to filter freq
   cutoff = S16ClipU14(cutoff + S8S8Mul(patch_.filter_kbt,  
     modulation_sources_[MOD_SRC_NOTE] + 128)); // keyb tracking (note) to filter freq
-  
+  cutoff = S16ClipU14(cutoff + vintage_cutoff);
+
   // Store in memory all the updated parameters.
   modulation_destinations_[MOD_DST_FILTER_CUTOFF] = U14ShiftRight6(cutoff);
 #ifdef POLIVOKS_FILTERBOARD
@@ -350,9 +420,10 @@ inline void Voice::UpdateDestinations() {
   osc_2.set_parameter(U15ShiftRight7(dst_[MOD_DST_PARAMETER_2]));
   osc_2.set_fm_parameter(patch_.osc[1].range + 36);
   
-  int8_t attack_mod = U15ShiftRight7(dst_[MOD_DST_ATTACK]) - 64;
-  int8_t decay_mod = U15ShiftRight7(dst_[MOD_DST_DECAY]) - 64;
-  int8_t release_mod = U15ShiftRight7(dst_[MOD_DST_RELEASE]) - 64;
+  int8_t attack_mod = U15ShiftRight7(dst_[MOD_DST_ATTACK]) - 64 + vintage_env;
+  int8_t decay_mod = U15ShiftRight7(dst_[MOD_DST_DECAY]) - 64 + vintage_env;
+  int8_t release_mod = U15ShiftRight7(dst_[MOD_DST_RELEASE]) - 64 +
+      vintage_env;
   for (int i = 0; i < kNumEnvelopes; ++i) {
     int16_t new_attack = patch_.env_lfo[i].attack;
     new_attack = Clip(new_attack + attack_mod, 0, 127);
@@ -387,7 +458,8 @@ inline void Voice::RenderOscillators() {
   // -0.5 / +0.5 semitones by the vibrato and pitch bend (fine).
   base_pitch += (dst_[MOD_DST_OSC_1_2_COARSE] - 8192) >> 4;
   base_pitch += (dst_[MOD_DST_OSC_1_2_FINE] - 8192) >> 7;
-  
+  base_pitch += vintage_pitch;
+
   // Update the oscillator parameters.
   for (uint8_t i = 0; i < kNumOscillators; ++i) {
     int16_t pitch = base_pitch;

@@ -103,6 +103,10 @@ class Voice {
   
   static void ResetAllControllers();
 
+  // YAM+: index of the voicecard slot (0-5), assigned by the controller.
+  // Selects the per-voice vintage offsets and seeds the drift generator.
+  static void set_voice_index(uint8_t index);
+
  private:
   static inline void LoadSources() __attribute__((always_inline));
   static inline void ProcessModulationMatrix() __attribute__((always_inline));

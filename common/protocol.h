@@ -27,6 +27,7 @@
 // 0x60 release
 // 0x70 kill
 // 0x8n retrigger envelope
+// 0x9n set voice index to n (YAM+)
 // 0xf6 clear load probe (YAM+)
 // 0xf7 get underrun count (YAM+)
 // 0xf8 reset all controllers
@@ -63,6 +64,8 @@ enum ProtocolCommands {
   COMMAND_KILL = 0x70,
   
   COMMAND_RETRIGGER_ENVELOPE = 0x80,
+
+  COMMAND_SET_VOICE_INDEX = 0x90,  // YAM+, low nibble = index.
 
   // YAM+ diagnostics (see voicecard/load_probe.h).
   COMMAND_CLEAR_LOAD_PROBE = 0xf6,

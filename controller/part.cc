@@ -155,8 +155,10 @@ void Part::Touch() {
 
 void Part::TouchPatch() {
   flags_ = FLAG_HAS_CHANGE;
-  // Send an "enter block write" command to all voicecards.
+  // Send an "enter block write" command to all voicecards. The voice index
+  // (YAM+ vintage) is refreshed too, in case a voicecard was rebooted.
   for (uint8_t i = 0; i < num_allocated_voices_; ++i) {
+    voicecard_tx.SetVoiceIndex(allocated_voices_[i]);
     voicecard_tx.PrepareForBlockWrite(allocated_voices_[i]);
   }
   // Wait for the voicecard to process the "enter block write" command.

@@ -118,6 +118,11 @@ class VoicecardProtocolTx {
     Write(voice_id, COMMAND_CLEAR_LOAD_PROBE);
   }
 
+  // YAM+: tells a voicecard which slot it sits in (vintage personality).
+  static inline void SetVoiceIndex(uint8_t voice_id) {
+    Write(voice_id, COMMAND_SET_VOICE_INDEX | voice_id);
+  }
+
   static inline uint8_t voice_status(uint8_t voice_id) {
     return voice_status_[voice_id];
   }

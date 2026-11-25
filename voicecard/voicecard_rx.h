@@ -106,6 +106,10 @@ class VoicecardProtocolRx {
   }
   
   static void DoShortCommand() {
+    if ((command_ & 0xf0) == COMMAND_SET_VOICE_INDEX) {
+      voice.set_voice_index(command_ & 0x0f);
+      return;
+    }
     switch (command_) {
       case COMMAND_RELEASE:
         voice.Release();

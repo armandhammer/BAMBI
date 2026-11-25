@@ -41,6 +41,9 @@ crv3
 env1 curve
 env2 curve
 env3 curve
+vint
+vintage
+voice
 attack
 decay
 sustain

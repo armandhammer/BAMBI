@@ -295,7 +295,7 @@ static const prog_char midi_cc_map[128] PROGMEM = {
    255, 255, 255, 255, 255, 255,  49,  50,
     51,  52,  53,  57,  73,  74,  75,  76,
    // 112-127
-    77, 255, 255, 255, 255, 255, 255, 255,
+    77,  78, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };
 
@@ -320,7 +320,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
     37,  35,  36,  37,  39,  40,  41,  39,
    // 96-111
     40,  41,  39,  40,  41,  39,  40,  41,
-    73,  74,  75,  76,  77, 255, 255, 255,
+    73,  74,  75,  76,  77,  78, 255, 255,
    // 112-127
    42,  43,  44,  45,  46,  47,  48,  49,
    50,  51,  52,  53,  54,  55,  56,  57,
@@ -899,6 +899,13 @@ static const prog_Parameter parameters[kNumParameters] PROGMEM = {
     UNIT_UINT8, 0, 127,
     1, 0, 0xff, 112,
     STR_RES_CRV3, STR_RES_ENV3_CURVE, STR_RES_ENVELOPE },
+  
+  // 78 (YAM+): per-voice analog variance and drift.
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_VINTAGE,
+    UNIT_UINT8, 0, 127,
+    1, 0, 0xff, 113,
+    STR_RES_VINT, STR_RES_VINTAGE, STR_RES_VOICE },
 };
 
 /* static */
