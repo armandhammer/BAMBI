@@ -292,6 +292,7 @@ class Multi {
   
  private:
   static void ComputeInternalClockOverflowsTable();
+  static void SetTickDuration(uint16_t duration);
   
   // Incremented at 39kHz
   static uint16_t clock_counter_;
