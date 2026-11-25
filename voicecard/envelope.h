@@ -63,11 +63,15 @@ class Envelope {
     phase_increment_ = stage_phase_increment_[stage];
   }
   
+  // curve (YAM+): 0 = exponential segments (stock), 64 = linear,
+  // 127 = inverse exponential (slow start). Applies to all segments.
   inline void Update(
       uint8_t attack,
       uint8_t decay,
       uint8_t sustain,
-      uint8_t release) {
+      uint8_t release,
+      uint8_t curve) {
+    curve_ = curve;
     stage_phase_increment_[ATTACK] = ResourcesManager::Lookup<
         uint16_t, uint8_t>(lut_res_env_portamento_increments, attack);
     stage_phase_increment_[DECAY] = ResourcesManager::Lookup<
@@ -86,12 +90,29 @@ class Envelope {
     }
     if (phase_increment_) {
       uint8_t step = InterpolateSample(wav_res_env_expo, phase_);
+      if (curve_) {
+        step = Shape(step);
+      }
       value_ = U8MixU16(a_, b_, step);
     }
     return value_ >> 8;
   }
 
  private:
+  // Blends the stock exponential segment shape toward linear (curve 1..64),
+  // then from linear toward its mirror image (curve 65..127).
+  inline uint8_t Shape(uint8_t expo) {
+    uint8_t linear = phase_ >> 8;
+    if (curve_ <= 64) {
+      return U8Mix(expo, linear, curve_ == 64 ? 255 : curve_ << 2);
+    } else {
+      uint8_t inverse = 255 - InterpolateSample(
+          wav_res_env_expo, 65535 - phase_);
+      return U8Mix(linear, inverse, (curve_ - 64) << 2);
+    }
+  }
+
+
   // Phase increments for each stage.
   uint16_t stage_phase_increment_[NUM_SEGMENTS];
   // Value that needs to be reached at the end of each stage.
@@ -109,6 +130,9 @@ class Envelope {
 
   // Current value of the envelope.
   uint16_t value_;
+
+  // Segment shape (YAM+), see Update().
+  uint8_t curve_;
 
   DISALLOW_COPY_AND_ASSIGN(Envelope);
 };

@@ -364,7 +364,8 @@ inline void Voice::UpdateDestinations() {
           new_attack,
           new_decay,
           patch_.env_lfo[i].sustain,
-          new_release);
+          new_release,
+          patch_.env_curve[i]);
   }
   
   voice_lfo_.set_phase_increment(

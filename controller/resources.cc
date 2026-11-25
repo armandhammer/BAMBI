@@ -21,7 +21,7 @@
 // make resources
 
 
-#include "controller\resources.h"
+#include "controller/resources.h"
 
 namespace ambika {
 
@@ -40,6 +40,12 @@ static const prog_char str_res_env2Tvcf[] PROGMEM = "env2~vcf";
 static const prog_char str_res_lfo2Tvcf[] PROGMEM = "lfo2~vcf";
 static const prog_char str_res_veloTvcf[] PROGMEM = "velo~vcf";
 static const prog_char str_res_keybTvcf[] PROGMEM = "keyb~vcf";
+static const prog_char str_res_crv1[] PROGMEM = "crv1";
+static const prog_char str_res_crv2[] PROGMEM = "crv2";
+static const prog_char str_res_crv3[] PROGMEM = "crv3";
+static const prog_char str_res_env1_curve[] PROGMEM = "env1 curve";
+static const prog_char str_res_env2_curve[] PROGMEM = "env2 curve";
+static const prog_char str_res_env3_curve[] PROGMEM = "env3 curve";
 static const prog_char str_res_attack[] PROGMEM = "attack";
 static const prog_char str_res_decay[] PROGMEM = "decay";
 static const prog_char str_res_sustain[] PROGMEM = "sustain";
@@ -399,6 +405,12 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_lfo2Tvcf,
   str_res_veloTvcf,
   str_res_keybTvcf,
+  str_res_crv1,
+  str_res_crv2,
+  str_res_crv3,
+  str_res_env1_curve,
+  str_res_env2_curve,
+  str_res_env3_curve,
   str_res_attack,
   str_res_decay,
   str_res_sustain,

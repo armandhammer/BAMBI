@@ -35,6 +35,12 @@ env2~vcf
 lfo2~vcf
 velo~vcf
 keyb~vcf
+crv1
+crv2
+crv3
+env1 curve
+env2 curve
+env3 curve
 attack
 decay
 sustain

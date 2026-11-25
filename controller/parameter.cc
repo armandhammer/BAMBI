@@ -293,9 +293,9 @@ static const prog_char midi_cc_map[128] PROGMEM = {
     28,  25, 255,  26, 255, 255,  44,  45,
    // 96-111
    255, 255, 255, 255, 255, 255,  49,  50,
-    51,  52,  53,  57,  73,  74, 255, 255,
+    51,  52,  53,  57,  73,  74,  75,  76,
    // 112-127
-   255, 255, 255, 255, 255, 255, 255, 255,
+    77, 255, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };
 
@@ -320,7 +320,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
     37,  35,  36,  37,  39,  40,  41,  39,
    // 96-111
     40,  41,  39,  40,  41,  39,  40,  41,
-    73,  74, 255, 255, 255, 255, 255, 255,
+    73,  74,  75,  76,  77, 255, 255, 255,
    // 112-127
    42,  43,  44,  45,  46,  47,  48,  49,
    50,  51,  52,  53,  54,  55,  56,  57,
@@ -879,6 +879,26 @@ static const prog_Parameter parameters[kNumParameters] PROGMEM = {
     UNIT_INT8, -63, 63,
     1, 0, 0xff, 109,
     STR_RES_KEYBTVCF, STR_RES_KEYBTVCF, STR_RES_FILTER_1 },
+
+  // 75-77 (YAM+): envelope curves. 0 = exponential (stock), 64 = linear,
+  // 127 = inverse exponential.
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_ENV_CURVE,
+    UNIT_UINT8, 0, 127,
+    1, 0, 0xff, 110,
+    STR_RES_CRV1, STR_RES_ENV1_CURVE, STR_RES_ENVELOPE },
+
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_ENV_CURVE + 1,
+    UNIT_UINT8, 0, 127,
+    1, 0, 0xff, 111,
+    STR_RES_CRV2, STR_RES_ENV2_CURVE, STR_RES_ENVELOPE },
+
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_ENV_CURVE + 2,
+    UNIT_UINT8, 0, 127,
+    1, 0, 0xff, 112,
+    STR_RES_CRV3, STR_RES_ENV3_CURVE, STR_RES_ENVELOPE },
 };
 
 /* static */

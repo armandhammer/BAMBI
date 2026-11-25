@@ -284,8 +284,15 @@ struct Patch {
   int8_t filter_velo;
   int8_t filter_kbt;
   
-  // Offset: 106-112
-  uint8_t padding[6];
+  // Offset: 106-109 (YAM+). Envelope curve shape per envelope:
+  // 0 = exponential (stock YAM), 64 = linear, 127 = inverse exponential.
+  uint8_t env_curve[kNumEnvelopes];
+
+  // Offset: 109 (YAM+). Per-voice analog drift/variance amount, 0 = off.
+  uint8_t vintage;
+
+  // Offset: 110-112
+  uint8_t padding[2];
 };
 
 typedef Patch PROGMEM prog_Patch;
@@ -339,7 +346,11 @@ enum PatchParameter {
   PRM_PATCH_MOD_OPERATOR,
   
   PRM_PATCH_FILTER1_VELO = 104,
-  PRM_PATCH_FILTER1_KBT
+  PRM_PATCH_FILTER1_KBT,
+
+  // YAM+
+  PRM_PATCH_ENV_CURVE = 106,  // 106..108
+  PRM_PATCH_VINTAGE = 109
 };
 
 }  // namespace ambika
