@@ -32,7 +32,9 @@ static const uint8_t kControlRate = 40;
 // The latency is 1ms, with a buffer storing 4ms of audio.
 static const uint8_t kAudioBlockSize = kControlRate;
 
-const uint8_t kSystemVersion = 0x10;
+// 0x11 = YAM+ voicecard (CV smoothing, envelope curves, vintage, load probe,
+// commands 0x9n/0xf6/0xf7/0xfe). Stock YAM voicecards report 0x10.
+const uint8_t kSystemVersion = 0x11;
 
 static uint8_t* kFirmwareUpdateFlagPtr = (uint8_t*)(E2END);
 
