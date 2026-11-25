@@ -25,6 +25,7 @@
 
 #include "voicecard/audio_out.h"
 #include "voicecard/leds.h"
+#include "voicecard/load_probe.h"
 #include "voicecard/resources.h"
 #include "voicecard/voice.h"
 #include "voicecard/voicecard_rx.h"
@@ -70,6 +71,9 @@ ISR(TIMER2_OVF_vect) {
     vca_12bits.value = next_vca_value | 0x1000;
   }
   
+  if (!audio_buffer.readable() && LoadProbe::underruns != 255) {
+    ++LoadProbe::underruns;
+  }
   uint8_t sample = audio_buffer.ImmediateRead();
   if (++sample_counter >= voice.crush()) {
     dac_interface.Strobe();
@@ -133,15 +137,26 @@ int main(void) {
   Init();
   // For testing only...
   // voice.Trigger(60 * 128, 100, 0);
+  uint8_t load_probe_armed = 0;
   while (1) {
     // Check if there's a block of samples to fill.
     if (audio_buffer.writable() >= kAudioBlockSize) {
+      uint8_t queued = audio_buffer.readable();
       voicecard_rx.TickRxLed();
       voice.ProcessBlock();
       vcf_cutoff_out.Write(voice.cutoff());
       vcf_resonance_out.Write(voice.resonance());
       vcf_mode.Write(filter_mode_bytes[voice.patch().filter[0].mode]);
       update_vca = 1;
+      // Samples played by the ISR while this block was computed.
+      uint8_t played = queued + kAudioBlockSize - audio_buffer.readable();
+      if (!load_probe_armed) {
+        // Ignore the start-up period, when the buffer is still empty.
+        LoadProbe::Clear();
+        load_probe_armed = 1;
+      } else if (played > LoadProbe::peak_block_samples) {
+        LoadProbe::peak_block_samples = played;
+      }
     }
     voicecard_rx.Process();
   }

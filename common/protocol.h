@@ -27,14 +27,19 @@
 // 0x60 release
 // 0x70 kill
 // 0x8n retrigger envelope
+// 0xf6 clear load probe (YAM+)
+// 0xf7 get underrun count (YAM+)
 // 0xf8 reset all controllers
 // 0xf9 reset
 // 0xfa lights out
 // 0xfb trigger firmware update
 // 0xfc get product ID
 // 0xfd get version ID
-// 0xfe ...
+// 0xfe get peak block load (YAM+)
 // 0xff sync/receive
+//
+// "get" commands are answered on the next SPI transfer: the controller sends
+// the command, waits, then reads the reply while sending 0xff.
 
 #ifndef COMMON_PROTOCOL_H_
 #define COMMON_PROTOCOL_H_
@@ -58,7 +63,11 @@ enum ProtocolCommands {
   COMMAND_KILL = 0x70,
   
   COMMAND_RETRIGGER_ENVELOPE = 0x80,
-  
+
+  // YAM+ diagnostics (see voicecard/load_probe.h).
+  COMMAND_CLEAR_LOAD_PROBE = 0xf6,
+  COMMAND_GET_UNDERRUNS = 0xf7,
+
   COMMAND_RESET_ALL_CONTROLLERS = 0xf8,
   COMMAND_RESET = 0xf9,
 
@@ -66,6 +75,7 @@ enum ProtocolCommands {
   COMMAND_FIRMWARE_UPDATE_MODE = 0xfb,
   COMMAND_GET_SLAVE_ID = 0xfc,
   COMMAND_GET_VERSION_ID = 0xfd,
+  COMMAND_GET_PEAK_LOAD = 0xfe,
   COMMAND_SYNC = 0xff
 };
 

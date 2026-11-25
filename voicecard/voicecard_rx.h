@@ -25,6 +25,7 @@
 
 #include "common/protocol.h"
 
+#include "voicecard/load_probe.h"
 #include "voicecard/voice.h"
 #include "voicecard/voicecard.h"
 #include "voicecard/leds.h"
@@ -152,8 +153,17 @@ class VoicecardProtocolRx {
       case COMMAND_GET_SLAVE_ID:
         SPDR = SLAVE_ID_SOLO_VOICECARD;
         break;
-      case COMMAND_GET_VERSION_ID:  
+      case COMMAND_GET_VERSION_ID:
         SPDR = kSystemVersion;
+        break;
+      case COMMAND_GET_PEAK_LOAD:
+        SPDR = LoadProbe::peak_block_samples;
+        break;
+      case COMMAND_GET_UNDERRUNS:
+        SPDR = LoadProbe::underruns;
+        break;
+      case COMMAND_CLEAR_LOAD_PROBE:
+        LoadProbe::Clear();
         break;
     }
   }

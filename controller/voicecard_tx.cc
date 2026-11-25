@@ -116,13 +116,16 @@ void VoicecardProtocolTx::WriteLfo(
 }
 
 /* static */
-Word VoicecardProtocolTx::GetVersion(uint8_t voice_id) {
+Word VoicecardProtocolTx::Query(
+    uint8_t voice_id,
+    uint8_t command_a,
+    uint8_t command_b) {
   Word result;
   Sync(voice_id);
-  BlockingTransaction(voice_id, COMMAND_GET_SLAVE_ID);
+  BlockingTransaction(voice_id, command_a);
   ConstantDelay(5);
   result.bytes[0] = BlockingTransaction(voice_id, 0xff);
-  BlockingTransaction(voice_id, COMMAND_GET_VERSION_ID);
+  BlockingTransaction(voice_id, command_b);
   ConstantDelay(5);
   result.bytes[1] = BlockingTransaction(voice_id, 0xff);
   return result;

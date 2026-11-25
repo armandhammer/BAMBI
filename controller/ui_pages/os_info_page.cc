@@ -27,6 +27,7 @@
 #include "controller/display.h"
 #include "controller/leds.h"
 #include "controller/multi.h"
+#include "controller/stack_probe.h"
 #include "controller/storage.h"
 
 namespace ambika {
@@ -71,6 +72,15 @@ void OsInfoPage::FindFirmwareFiles() {
 uint8_t OsInfoPage::OnIncrement(int8_t increment) {
   active_control_ = Clip(active_control_ + increment, 0, kNumVoices);
   FindFirmwareFiles();
+}
+
+/* static */
+uint8_t OsInfoPage::OnClick() {
+  // Restart the peak-hold load/underrun measurement of the selected voicecard.
+  if (active_control_ < kNumVoices) {
+    voicecard_tx.ClearLoadProbe(active_control_);
+  }
+  return 1;
 }
 
 /* static */
@@ -148,7 +158,26 @@ void OsInfoPage::UpdateScreen() {
   if (found_firmware_files_ & 1) {
     strncpy_P(&buffer[0], PSTR("upgrade"), 7);
   }
+  // YAM+ diagnostics: worst-case free stack on the controller since boot.
+  buffer[8] = 's';
+  buffer[9] = 't';
+  buffer[10] = 'k';
+  UnsafeItoa<int16_t>(StackProbe::FreeBytes(), 3, &buffer[11]);
+  AlignRight(&buffer[11], 3);
   buffer[14] = kDelimiter;
+  if (valid_device) {
+    // Peak CPU load (40 samples per block = 100%) and audio underruns of the
+    // selected voicecard. Encoder click clears them.
+    Word load = voicecard_tx.GetLoadProbe(active_control_);
+    buffer[23] = 'l';
+    buffer[24] = 'd';
+    UnsafeItoa<int16_t>(U8U8Mul(load.bytes[0], 5) >> 1, 3, &buffer[25]);
+    AlignRight(&buffer[25], 3);
+    buffer[28] = '%';
+    buffer[30] = 'u';
+    UnsafeItoa<int16_t>(load.bytes[1], 3, &buffer[31]);
+    AlignRight(&buffer[31], 3);
+  }
   if (found_firmware_files_ & 2) {
     if (valid_device) {
       strncpy_P(&buffer[15], PSTR("upgrade"), 7);

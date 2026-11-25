@@ -103,7 +103,20 @@ class VoicecardProtocolTx {
     Write(voice_id, COMMAND_RESET);
   }
   
-  static Word GetVersion(uint8_t voice_id);
+  // bytes[0] = slave ID, bytes[1] = firmware version.
+  static inline Word GetVersion(uint8_t voice_id) {
+    return Query(voice_id, COMMAND_GET_SLAVE_ID, COMMAND_GET_VERSION_ID);
+  }
+
+  // YAM+ diagnostics: bytes[0] = peak samples played per block (40 = 100%
+  // CPU), bytes[1] = audio underruns. Both are peak-hold on the voicecard.
+  static inline Word GetLoadProbe(uint8_t voice_id) {
+    return Query(voice_id, COMMAND_GET_PEAK_LOAD, COMMAND_GET_UNDERRUNS);
+  }
+
+  static inline void ClearLoadProbe(uint8_t voice_id) {
+    Write(voice_id, COMMAND_CLEAR_LOAD_PROBE);
+  }
 
   static inline uint8_t voice_status(uint8_t voice_id) {
     return voice_status_[voice_id];
@@ -159,6 +172,8 @@ class VoicecardProtocolTx {
   }
   
  private:
+  // Sends two "get" commands and returns their one-byte replies.
+  static Word Query(uint8_t voice_id, uint8_t command_a, uint8_t command_b);
   // Flush the buffer and do a write/read transaction.
   static uint8_t BlockingTransaction(uint8_t voice_id, uint8_t value);
   static void Write(uint8_t voice_id, uint8_t value);

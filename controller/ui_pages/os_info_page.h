@@ -32,6 +32,7 @@ class OsInfoPage : public UiPage {
   
   static uint8_t OnKey(uint8_t key);
   static uint8_t OnIncrement(int8_t increment);
+  static uint8_t OnClick();
   static void UpdateScreen();
   static void UpdateLeds();
 
