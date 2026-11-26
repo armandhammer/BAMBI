@@ -180,5 +180,21 @@ The voicecard now writes incoming patch bytes straight into its patch
 10. [ ] With an SD card: save a program, edit it, save again, and use the
     version manager to go back one version. Works as before.
 
+### M. SysEx and NRPN hardening (10 min, needs a computer)
+11. [ ] SHED (or the Ixox editor): pull and push a patch, a part and a
+    multi. Everything round-trips as before.
+12. [ ] Load a few programs and multis from the SD card, including old
+    ones: they sound as before. (Loading now clamps every value to its
+    parameter range. Files saved by this or stock firmware are in range,
+    so nothing should change.)
+13. [ ] Optional, with `utils/yamplus_sysex.py` or any SysEx tool: send a
+    patch dump with argument 9 (`F0 00 21 02 00 04 01 09 ...`). The
+    Ambika ignores it and nothing else changes (stock YAM overwrote
+    memory after part 6).
+14. [ ] Optional: send NRPN MSB 1 / LSB 120 with any value on the part's
+    channel. Nothing happens (stock YAM wrote into the part's internal
+    state).
+15. [ ] On a `bpm` pot/knob, turn fully left: the display shows `ext`.
+
 **Please send back:** anything that sounds different from YAM+ 0.1 in
-I or K.
+I, K or M.

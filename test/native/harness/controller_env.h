@@ -36,12 +36,16 @@ void Run(int ticks);
 const std::vector<uint8_t>& MidiOut();
 void ClearMidiOut();
 
-// Every SPI byte sent to voicecard |voice| (0..5) since ClearSpi().
+// Every SPI byte sent to voicecard |voice| (0..5) since ClearSpi(). Slave 6
+// is the expansion port, 7 the SD card.
 const std::vector<uint8_t>& VoicecardBytes(uint8_t voice);
 void ClearSpi();
 
-// Value a voicecard returns on the next SPI transfer (default 0).
-void SetSpiReply(uint8_t value);
+// Simulated voicecards answer SPI queries: after COMMAND_GET_SLAVE_ID the
+// next transfer returns |slave_id| (1 = solo voicecard), after
+// COMMAND_GET_VERSION_ID |version|. Absent voicecards (bit clear in
+// |present_mask|) answer 0xff, like a floating MISO line with pull-up.
+void SetVoicecards(uint8_t present_mask, uint8_t slave_id, uint8_t version);
 
 // How often firmware code busy-waited (each one ran the simulated ISRs).
 unsigned long BusyWaits();

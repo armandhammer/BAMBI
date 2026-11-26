@@ -9,7 +9,9 @@
 
 #include "controller/midi_dispatcher.h"
 #include "controller/multi.h"
+#include "common/protocol.h"
 #include "controller/stack_probe.h"
+#include "controller/storage.h"
 #include "controller/system_settings.h"
 #include "controller/voicecard_tx.h"
 #include "midi/midi.h"
@@ -33,7 +35,11 @@ namespace native_env {
 
 static std::vector<uint8_t> midi_out;
 static std::vector<uint8_t> spi_bytes[8];
-static uint8_t spi_reply = 0;
+static uint8_t vc_present = 0x3f;
+static uint8_t vc_slave_id = 1;
+static uint8_t vc_version = 0x11;
+static uint8_t spi_current[8];  // shifted out during the current transfer
+static uint8_t spi_pending[8];  // loaded for the next one
 static unsigned long busy_waits = 0;
 static unsigned long busy_waits_without_progress = 0;
 
@@ -64,7 +70,7 @@ void Boot() {
   memset(native_eeprom, 0xff, sizeof(native_eeprom));
   midi_out.clear();
   ClearSpi();
-  spi_reply = 0;
+  SetVoicecards(0x3f, 1, 0x11);
   busy_waits = 0;
   busy_waits_without_progress = 0;
   // Leftovers in the static ring buffers from a previous test.
@@ -72,6 +78,7 @@ void Boot() {
   midi_out.clear();
   // controller.cc Init(), minus the UI (LCD, switches) and the SD card.
   system_settings.Init(false);
+  storage.Init();
   voicecard_tx.Init();
   voicecard_tx.SyncAllVoices();
   multi.Init(false);
@@ -139,14 +146,33 @@ void ClearSpi() {
   for (int i = 0; i < 8; ++i) spi_bytes[i].clear();
 }
 
-void SetSpiReply(uint8_t value) { spi_reply = value; }
+void SetVoicecards(uint8_t present_mask, uint8_t slave_id, uint8_t version) {
+  vc_present = present_mask;
+  vc_slave_id = slave_id;
+  vc_version = version;
+  memset(spi_current, 0, sizeof(spi_current));
+  memset(spi_pending, 0, sizeof(spi_pending));
+}
 
 unsigned long BusyWaits() { return busy_waits; }
 
-uint8_t CurrentSpiReply() { return spi_reply; }
+uint8_t CurrentSpiReply() { return spi_current[PORTB & 0x07]; }
 
 void LogSpi(uint8_t value) {
-  spi_bytes[PORTB & 0x07].push_back(value);
+  uint8_t slave = PORTB & 0x07;
+  spi_bytes[slave].push_back(value);
+  // SPI is a shift register: the byte the slave returns during this transfer
+  // is the one it loaded after the previous one.
+  spi_current[slave] = spi_pending[slave];
+  if (slave >= 6 || !(vc_present & (1 << slave))) {
+    spi_current[slave] = spi_pending[slave] = 0xff;
+  } else if (value == COMMAND_GET_SLAVE_ID) {
+    spi_pending[slave] = vc_slave_id;
+  } else if (value == COMMAND_GET_VERSION_ID) {
+    spi_pending[slave] = vc_version;
+  } else if (value != 0xff) {
+    spi_pending[slave] = 0;
+  }
 }
 
 }  // namespace native_env

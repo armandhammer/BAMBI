@@ -27,6 +27,7 @@
 #include "controller/display.h"
 #include "controller/midi_dispatcher.h"
 #include "controller/multi.h"
+#include "controller/parameter.h"
 #include "controller/system_settings.h"
 #include "controller/ui.h"
 #include "controller/ui_pages/library.h"
@@ -318,16 +319,38 @@ void Storage::ReadObject(const StorageLocation& location) {
 }
 
 /* static */
+void Storage::SanitizePart(uint8_t part) {
+  // BAMBI: clamp every patch and part byte described by the parameter table
+  // to its range. A corrupt file, or a dump from another firmware, could
+  // otherwise send e.g. an oscillator shape past the end of the voicecard's
+  // function table (the voicecard jumps to a random address).
+  uint8_t* bytes = multi.mutable_part(part)->mutable_raw_patch_data();
+  for (uint8_t i = 0; i < kNumParameters; ++i) {
+    const Parameter& p = parameter_manager.parameter(i);
+    if (p.level > PARAMETER_LEVEL_PART) {
+      continue;
+    }
+    uint8_t address = p.offset;
+    for (uint8_t k = 0; k < p.num_instances; ++k) {
+      bytes[address] = p.Clamp(bytes[address]);
+      address += p.stride;
+    }
+  }
+}
+
+/* static */
 void Storage::TouchObject(const StorageLocation& location) {
   // Recompute the dependent variables and update the voicecard. Mark that the
   // object is freshly loaded and has received no user changes.
   switch (location.object) {
     case STORAGE_OBJECT_PATCH:
+      SanitizePart(location.part);
       multi.mutable_part(location.part)->TouchPatch();
       break;
 
     case STORAGE_OBJECT_PART:
     case STORAGE_OBJECT_SEQUENCE:
+      SanitizePart(location.part);
       multi.mutable_part(location.part)->Touch();
       break;
     
@@ -525,7 +548,10 @@ FilesystemStatus Storage::Load(
         destination.part = id.bytes[1] == 0 ? location.part : (id.bytes[1] - 1);
       
         uint8_t expected_size = object_size(destination);
-        if (expected_size == size.value - 4) {
+        // BAMBI: a corrupt file must not name a part past the sixth.
+        if (expected_size == size.value - 4 &&
+            (destination.object == STORAGE_OBJECT_MULTI ||
+             destination.part < kNumParts)) {
           uint8_t* data = mutable_object_data(destination);
           file_.Read(data, expected_size, &read);
           skip_data = 0;
@@ -785,7 +811,7 @@ void Storage::SysExParseCommand() {
       break;
     
     default:
-      sysex_rx_state_ = RECEIVING_FOOTER;
+      sysex_rx_state_ = RECEPTION_ERROR;  // BAMBI, see SysExReceive().
       break;
   }
 }
@@ -798,6 +824,16 @@ void Storage::SysExAcceptCommand() {
   location.part = sysex_rx_command_[1] == 0
     ?  ui.state().active_part
     : sysex_rx_command_[1] - 1;
+
+  // BAMBI: for part objects (patch, sequence, program, part: commands
+  // 0x01-0x05 and 0x11-0x15 except the multi), the argument is the part
+  // 1-6 (0 = active part). YAM indexed past the parts for 7-127.
+  uint8_t object_command = sysex_rx_command_[0] & 0xef;
+  if (object_command >= 0x01 && object_command <= 0x05 &&
+      object_command != 0x04 && location.part >= kNumParts) {
+    sysex_rx_state_ = RECEPTION_ERROR;
+    return;
+  }
 
   switch (sysex_rx_command_[0]) {
     case 0x01:
@@ -887,7 +923,10 @@ void Storage::SysExReceive(uint8_t byte) {
           sysex_rx_bytes_received_ = 0;
         }
       } else {
-        sysex_rx_state_ = RECEIVING_FOOTER;
+        // BAMBI: not for us; ignore everything up to the next F0. (YAM went
+        // to RECEIVING_FOOTER, which accepts the *previous* command on F7
+        // if its checksum byte happens to be 0.)
+        sysex_rx_state_ = RECEPTION_ERROR;
       }
       break;
 
