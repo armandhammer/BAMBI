@@ -79,7 +79,12 @@ while (shifts > 0) { \
   blep_index <<= 1; \
   --shifts; \
 } \
-result_blep_index = U16U8MulShift8(result_blep_index, quotient);
+result_blep_index = U16U8MulShift8(result_blep_index, quotient); \
+/* BAMBI: the 1/increment approximation can overshoot the 128-entry */ \
+/* blep table (and 127 - index would wrap). Clamp to the last entry. */ \
+if (result_blep_index > 127) { \
+  result_blep_index = 127; \
+}
   
 // ------- Silence (useful when processing external signals) -----------------
 void Oscillator::RenderSilence(uint8_t* buffer) {
@@ -608,9 +613,15 @@ void Oscillator::RenderInterpolatedWavetable(uint8_t* buffer) {
 
 // The position is freely determined by the parameter
 void Oscillator::RenderWavequence(uint8_t* buffer) {
-  const prog_uint8_t* wave = wav_res_waves + U8U8Mul(
-      parameter_,
-      129);
+  // BAMBI: waves.bin holds 80 single-cycle waves of 129 bytes. Stock YAM
+  // read past the table (other data, then code) for parameter 80..127, so
+  // those settings played whatever the linker put there. Clamp instead.
+  static const uint8_t kNumWaves = WAV_RES_WAVES_SIZE / 129;
+  uint8_t index = parameter_;
+  if (index >= kNumWaves) {
+    index = kNumWaves - 1;
+  }
+  const prog_uint8_t* wave = wav_res_waves + U8U8Mul(index, 129);
   BEGIN_SAMPLE_LOOP
     UPDATE_PHASE
     *buffer++ = InterpolateSample(wave, phase.integral >> 1);

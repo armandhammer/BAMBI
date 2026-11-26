@@ -204,6 +204,7 @@ class Storage {
   static void SysExSendRaw(uint8_t, uint8_t, const uint8_t*, uint8_t, bool);
   static void RIFFWriteObject(const StorageLocation& location);
   static void TouchObject(const StorageLocation& location);
+  static void SanitizePart(uint8_t part);
 
   static void SysExParseCommand();
   static void SysExAcceptCommand();

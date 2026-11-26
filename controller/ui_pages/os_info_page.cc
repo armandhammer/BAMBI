@@ -72,6 +72,7 @@ void OsInfoPage::FindFirmwareFiles() {
 uint8_t OsInfoPage::OnIncrement(int8_t increment) {
   active_control_ = Clip(active_control_ + increment, 0, kNumVoices);
   FindFirmwareFiles();
+  return 1;
 }
 
 /* static */

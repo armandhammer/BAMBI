@@ -78,6 +78,11 @@ uint8_t Parameter::Scale(uint8_t value_7bits) const {
         scaled_value = 240;
       }
       scaled_value &= 0xfe;
+      // BAMBI: below 40 means external clock; keep it at the range minimum
+      // (39) instead of the out-of-range 38 the rounding gave.
+      if (scaled_value < 40) {
+        scaled_value = 39;
+      }
     }
   }
   return scaled_value;
@@ -350,7 +355,12 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
    // 208-223
    255, 255, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255,
-   // 224-255
+   // 224-239
+   255, 255, 255, 255, 255, 255, 255, 255,
+   255, 255, 255, 255, 255, 255, 255, 255,
+   // 240-255. BAMBI: these 16 entries were missing, so the compiler filled
+   // them with 0 (= oscillator 1 shape) and NRPN 240-255 wrote past the
+   // part data, into the Part object itself.
    255, 255, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };

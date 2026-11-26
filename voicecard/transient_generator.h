@@ -49,7 +49,7 @@ class TransientGenerator {
     }
   }
   
-  static inline uint8_t Trigger() {
+  static inline void Trigger() {
     counter_ = 255;
   }
   
