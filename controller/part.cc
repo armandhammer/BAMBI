@@ -493,7 +493,11 @@ void Part::Aftertouch(uint8_t note, uint8_t velocity) {
     // Send the aftertouch change to the voicecard playing the affected note.
     uint8_t voice_index = poly_allocator_.Find(note);
     uint8_t size = poly_allocator_.size();
-    if (data_.polyphony_mode == CYCLIC) {
+    // BAMBI fix: in CHAIN mode the allocator also tracks the notes forwarded
+    // down the chain (indices >= size / 2); they have no local voicecard.
+    // Stock YAM tested CYCLIC here, which indexed past allocated_voices_[]
+    // in CHAIN mode and starved half the voices in CYCLIC mode.
+    if (data_.polyphony_mode == CHAIN) {
       size >>= 1;
     }
     if (voice_index < size) {

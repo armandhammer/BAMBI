@@ -235,7 +235,7 @@ FilesystemStatus Storage::Snapshot(const StorageLocation& location) {
   StorageLocation l = location;
   uint8_t version = version_[location.index()];
   l.slot = version;
-  Save(STORAGE_HISTORY, l);
+  FilesystemStatus status = Save(STORAGE_HISTORY, l);
   
   // Create a gap in the version number sequence to prevent forwarding.
   ++version;
@@ -247,6 +247,7 @@ FilesystemStatus Storage::Snapshot(const StorageLocation& location) {
     fs_.Unlink(forward_version_name);
   }
   version_[location.index()] = version;
+  return status;
 }
 
 /* static */
@@ -431,7 +432,7 @@ void Storage::SysExSendRaw(
   uint8_t checksum = 0;
   if (send_address) {
     Word address;
-    address.value = (uint16_t)(void*)(data);
+    address.value = (uint16_t)(uintptr_t)(data);
     checksum += address.bytes[0];
     checksum += address.bytes[1];
     midi_dispatcher.SendBlocking(U8ShiftRight4(address.bytes[0]));

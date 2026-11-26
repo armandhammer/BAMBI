@@ -39,9 +39,7 @@ TransientGenerator transient_generator;
 
 /* <static> */
 
-uint8_t Voice::patch_data_[1];
 Patch Voice::patch_;
-uint8_t Voice::part_data_[1];
 Part Voice::part_;
 
 Lfo Voice::voice_lfo_;
@@ -166,7 +164,7 @@ static const prog_Patch init_patch PROGMEM = {
 
 /* static */
 void Voice::set_patch_data(uint8_t address, uint8_t value) {
-  patch_data_[address + 1] = value;
+  mutable_patch_data()[address] = value;
 }
 
 /* static */

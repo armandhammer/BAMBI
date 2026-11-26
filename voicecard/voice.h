@@ -87,12 +87,15 @@ class Voice {
   }
   
   static void set_patch_data(uint8_t address, uint8_t value);
+  // BAMBI: patch and part bytes are written through patch_/part_ directly.
+  // Stock YAM wrote patch_data_[address + 1], relying on the linker placing
+  // patch_ right after a 1-byte array.
   static void set_part_data(uint8_t address, uint8_t value) {
-    part_data_[address + 1] = value;
+    static_cast<uint8_t*>(static_cast<void*>(&part_))[address] = value;
   }
   
   static uint8_t* mutable_patch_data() {
-    return &patch_data_[1];
+    return static_cast<uint8_t*>(static_cast<void*>(&patch_));
   }
   
   static const Patch& patch() { return patch_; }
@@ -113,9 +116,7 @@ class Voice {
   static inline void UpdateDestinations() __attribute__((always_inline));
   static inline void RenderOscillators() __attribute__((always_inline));
 
-  static uint8_t patch_data_[1];
   static Patch patch_;
-  static uint8_t part_data_[1];
   static Part part_;
   
   // Envelope generators.

@@ -138,3 +138,47 @@ show `YAMplus v0.1`, and each port `device 1 v1.1`.
 
 **Please send back:** `stk` values, the `ld`/`u` table, the 0xF8 count, and
 anything that sounds wrong (with the program name).
+
+---
+
+## BAMBI 0.2-dev: fixes found by the native test harness
+
+These came out of `test/native` (firmware compiled for a PC and
+unit-tested). Each one is covered by a test there; these checks confirm
+the hardware agrees. Flash the controller *and* all six voicecards.
+
+### I. Patches still reach the voicecards (5 min)
+The voicecard now writes incoming patch bytes straight into its patch
+(stock YAM went through a 1-byte array and relied on the linker).
+1. [ ] Load a few factory programs: each sounds as before.
+2. [ ] Turn cutoff, an envelope time, an oscillator shape and a mod-matrix
+   amount on part 1: each change is heard immediately on all its voices.
+3. [ ] Change part volume and portamento: heard on all voices.
+
+### J. Voice allocation (10 min)
+4. [ ] Part 1 with 6 voices, polyphony `cyclic`: hold six notes, then
+   release them; play six new ones. All six voices sound, in rotation.
+5. [ ] Still `cyclic`: play and release a few notes, then play note 127 (or
+   transpose up until the top key is G9) and release it. It stops (no
+   hanging note).
+6. [ ] Needs a keyboard with polyphonic aftertouch. Route aftertouch to
+   cutoff in the mod matrix. Polyphony `cyclic`, hold six notes and press
+   each key harder: *every* voice responds (stock YAM: only half did).
+7. [ ] Same in `chain` with a second Ambika (or just watch the voicecard
+   LEDs): pressing harder on a note that was passed down the chain must
+   not change any local voice.
+
+### K. Oscillators (5 min)
+8. [ ] Osc 1 shape `wavquence`, sweep the
+   parameter 0–127: up to 79 it steps through the waves as before; from 80
+   up it stays on the last wave (stock YAM played random flash data here).
+9. [ ] Shapes `saw`, `pwm` and `csaw`: play the top two octaves with
+   pitch bend and PWM modulation. Listen for clicks or crackles: there
+   should be none (and no change below the top octaves).
+
+### L. Library (2 min)
+10. [ ] With an SD card: save a program, edit it, save again, and use the
+    version manager to go back one version. Works as before.
+
+**Please send back:** anything that sounds different from YAM+ 0.1 in
+I or K.

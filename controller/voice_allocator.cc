@@ -96,15 +96,20 @@ uint8_t VoiceAllocator::FindActive(uint8_t note) const {
 }
 
 uint8_t VoiceAllocator::NoteOff(uint8_t note) {
-  uint8_t voice = Find(note);
+  uint8_t voice;
   if (cyclic_allocator_ == 0xff) {
+    voice = Find(note);
     if (voice != 0xff) {
       pool_[voice] &= 0x7f;
       Touch(voice);
     }
   } else {
+    // BAMBI fix: released cyclic slots used to be marked 0xff, which reads
+    // as "active, note 127". Only an active slot can be released, and a
+    // released one is cleared so it never matches a later note.
+    voice = FindActive(note);
     if (voice != 0xff) {
-      pool_[voice] = 0xff;
+      pool_[voice] = 0;
     }
   }
   return voice;
