@@ -79,7 +79,19 @@ $(BUILD)/controller_tests: $(CTRL_OBJS)
 $(BUILD)/voicecard_tests: $(VC_OBJS)
 	$(CXX) $(LDFLAGS) -Wl,--gc-sections -o $@ $^
 
-run: $(BUILD)/controller_tests $(BUILD)/voicecard_tests
+# The parameter table stores caption string ids on 8 bits: a caption with an
+# id >= 256 would be truncated silently (the build uses -w). Compile it once
+# more with that one warning as an error.
+$(BUILD)/parameter_table.check: controller/parameter.cc controller/parameter.h \
+                                controller/resources.h $(OVERRIDES)
+	@mkdir -p $(dir $@)
+	$(CXX) $(filter-out -w,$(CXXFLAGS)) -Werror=overflow $(CTRL_DEFS) \
+	  $(INCLUDES) -fsyntax-only controller/parameter.cc 2> $@.log || \
+	  { grep -A2 error $@.log; exit 1; }
+	@touch $@
+
+run: $(BUILD)/controller_tests $(BUILD)/voicecard_tests \
+     $(BUILD)/parameter_table.check
 	@echo "== controller"
 	@$(BUILD)/controller_tests $(TEST)
 	@echo "== voicecard"

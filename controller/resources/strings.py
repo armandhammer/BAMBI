@@ -19,6 +19,14 @@
 #
 # Resource strings for the motherboard/controller.
 
+# BAMBI: the parameter table stores its short name, long name and object as
+# 8-bit string ids, so every string a parameter uses as a caption must have an
+# id below 256. Captions whose text lives further down (in a value list or in
+# the object list near the end) get an alias right after "voice": a repeated
+# string costs only a pointer (the compiler shares the text), and the first
+# occurrence owns the STR_RES_ name. Never alias a string that is the first
+# entry of a value list (e.g. "off", "none", "free"), or the list would start
+# at the alias. Native test ParameterNamesMatchGolden checks every caption.
 strings = """
 waveform
 parameter
@@ -44,6 +52,21 @@ env3 curve
 vint
 vintage
 voice
+stl
+voice steal
+oscillator 1
+oscillator 2
+mixer
+lfo
+filter 1
+filter 2
+envelope
+clock
+system
+crush
+frequency
+arpeggio
+sequencer
 sprm
 spread mode
 stck
@@ -330,8 +353,6 @@ cyclic
 chain
 3x unison
 4x unison
-stl
-voice steal
 old
 low
 high

@@ -91,10 +91,12 @@ struct Parameter {
   uint8_t indexed_by;
   uint8_t midi_cc;
   
-  // Resource id of the short and long name of the parameter
-  ResourceId short_name;
-  ResourceId long_name;
-  ResourceId object;
+  // Resource id of the short and long name of the parameter. BAMBI: 8 bits
+  // (saves 3 bytes per parameter); captions must have string ids < 256, see
+  // controller/resources/strings.py.
+  uint8_t short_name;
+  uint8_t long_name;
+  uint8_t object;
   
   uint8_t Scale(uint8_t value_7bits) const;
   uint8_t Clamp(uint8_t value) const;
