@@ -56,6 +56,8 @@ enum Unit {
   UNIT_MIDI_CHANNEL,
   UNIT_SPREAD_MODE,  // YAM+
   UNIT_STEAL_MODE,  // BAMBI
+  UNIT_VOICE_LFO_MODE,  // BAMBI
+  UNIT_VELOCITY_CURVE,  // BAMBI
   UNIT_LAST
 };
 
@@ -91,10 +93,12 @@ struct Parameter {
   uint8_t indexed_by;
   uint8_t midi_cc;
   
-  // Resource id of the short and long name of the parameter
-  ResourceId short_name;
-  ResourceId long_name;
-  ResourceId object;
+  // Resource id of the short and long name of the parameter. BAMBI: 8 bits
+  // (saves 3 bytes per parameter); captions must have string ids < 256, see
+  // controller/resources/strings.py.
+  uint8_t short_name;
+  uint8_t long_name;
+  uint8_t object;
   
   uint8_t Scale(uint8_t value_7bits) const;
   uint8_t Clamp(uint8_t value) const;
@@ -119,7 +123,7 @@ struct Parameter {
   static void PrintNote(uint8_t note, char* buffer);
 };
 
-const uint8_t kNumParameters = 81;
+const uint8_t kNumParameters = 84;
 typedef Parameter PROGMEM prog_Parameter;
 
 // The parameter manager is the class who knows how to apply a parameter change

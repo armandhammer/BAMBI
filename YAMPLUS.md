@@ -72,6 +72,28 @@ rotating and `mono` has no voices to steal.
 A note that is not played is not forwarded down the chain either, and is
 not played later when a voice frees up.
 
+### Voice LFO trigger and slew, velocity curve (0.4; new third page)
+Press the ENV/LFO group button a third time (after the voice LFO page) for
+a page with the whole voice LFO and the velocity curve. Top row: `rate`
+and `wave` (the same settings as on the voice LFO page), `trig`, `slew`;
+bottom row: `velo`. All are patch settings, applied by each voicecard.
+- `trig` (voice LFO trigger):
+  - `free`: free running, as in YAM. Existing patches load as `free`.
+  - `env~lfo`: every new note (not a legato note) restarts the voice's LFO
+    at the start of its cycle; with `s&h` it draws a new random value.
+  - `once`: one-shot. Like `env~lfo`, then the LFO stops at the end of its
+    first cycle and holds its last value until the next note. With `ramp`
+    it is a per-voice rising envelope (rate = time); with `s&h` a random
+    value per note; with `tri`/`sqr` a single swell or a delayed step.
+- `slew` (0-127): smooths the voice LFO output (one-pole lag), 0 = off.
+  Takes the edges off `s&h` and `sqr` (glides between random values); about
+  3 ms at 1, 0.5 s at 64, 2.6 s at 96.
+- `velo` (velocity curve): `lin` (as YAM), `soft` (more output from soft
+  playing; half velocity gives 75%) or `hard` (needs a firmer touch; half
+  velocity gives 25%). It shapes the velocity modulation source, so it
+  applies to every velocity routing in the matrix and to `velo~vcf`.
+  Existing patches load as `lin`.
+
 ### Faster editing
 - Encoder acceleration: turning quickly moves values ×2/×4 (page navigation
   is not accelerated). Shift(S1)+encoder ×8 still works.
@@ -98,6 +120,9 @@ not played later when a voice frees up.
 | spread mode (part) | 114 | 192 | 0 stck, 1 cntr, 2 wide, 3 sub- (0.2) |
 | polyphony mode (part) | 107 | 127 | as YAM (0–4), 5 3x unison, 6 4x unison (0.2) |
 | voice steal (part) | 115 | 193 | 0 old, 1 low, 2 high, 3 none (0.3) |
+| voice LFO trigger | 116 | 110 | 0 free, 1 env~lfo, 2 once (0.4) |
+| voice LFO slew | 117 | 111 | 0-127 (0.4) |
+| velocity curve | 118 | 30 | 0 lin, 1 soft, 2 hard (0.4) |
 
 NRPN encoding as in YAM: NRPN MSB (CC99) = address bit 7, LSB (CC98) = address
 bits 0–6; data MSB (CC6) = value bit 7, LSB (CC38) = value bits 0–6.
@@ -112,7 +137,7 @@ payload (checksum `00 00`) unless noted.
 | `0x11`–`0x15` (dump patch/sequence/program/multi/part; arg = part, 0 = active) | `0x01`–`0x05`, **arg = part 1–6** (YAM: 0) | as YAM |
 | `0x16` name (arg = part; payload: 1 byte object 0 patch, 1 sequence, 2 program, 3 multi) | `0x06`, arg = part | object, bank (0 = A), slot, SD status (0 = ok), 16-char name |
 | `0x1a` current locations | `0x0a` | 19 little-endian words `bank << 8 \| slot`: part × 3 + {patch, sequence, program}, then multi |
-| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version (0x01 = 0.1, 0x02 = 0.2, 0x03 = 0.3), oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
+| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version (0x01 = 0.1, 0x02 = 0.2, 0x03 = 0.3, 0x04 = 0.4), oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
 
 `utils/yamplus_sysex.py` exercises these from a computer.
 
@@ -126,7 +151,10 @@ payload (checksum `00 00`) unless noted.
 |---|---|
 | patch 106–108 | `env_curve[3]` |
 | patch 109 | `vintage` |
-| patch 110–111 | spare |
+| patch 30 | `env_lfo[0].padding`: velocity curve (0.4; patch layout 2) |
+| patch 110 | `voice_lfo_mode` (0.4; patch layout 2) |
+| patch 111 | `voice_lfo_slew` (0.4; patch layout 2) |
+| patch 38, 46 | spare (`env_lfo[1..2].padding`) |
 | part 80 (address 192) | `spread_mode` |
 | part 81 (address 193) | `steal_mode` (0.3; part layout 2) |
 | part 82–83 | spare |

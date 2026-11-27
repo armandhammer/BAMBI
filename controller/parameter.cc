@@ -60,6 +60,8 @@ static const prog_uint16_t units_definitions[UNIT_LAST] PROGMEM = {
   0,                  // UNIT_MIDI_CHANNEL
   STR_RES_STCK,       // UNIT_SPREAD_MODE
   STR_RES_OLD,        // UNIT_STEAL_MODE
+  STR_RES__FREE,      // UNIT_VOICE_LFO_MODE
+  STR_RES_LIN,        // UNIT_VELOCITY_CURVE
 };
 
 static const prog_char note_names[] PROGMEM = " CC# DD# E FF# GG# AA# B";
@@ -309,7 +311,7 @@ static const prog_char midi_cc_map[128] PROGMEM = {
    255, 255, 255, 255, 255, 255,  49,  50,
     51,  52,  53,  57,  73,  74,  75,  76,
    // 112-127
-    77,  78,  79,  80, 255, 255, 255, 255,
+    77,  78,  79,  80,  81,  82,  83, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };
 
@@ -319,7 +321,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
      8,   9,  10,  11,  12,  13,  14,  15,
    // 16-31
     16,  17,  18,  19,  20,  21,  22,  23,
-    25,  26,  27,  28,  31,  30, 255,  29,
+    25,  26,  27,  28,  31,  30,  83,  29,
    // 32-47
     25,  26,  27,  28,  31,  30, 255,  29,
     25,  26,  27,  28,  31,  30, 255,  29,
@@ -334,7 +336,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
     37,  35,  36,  37,  39,  40,  41,  39,
    // 96-111
     40,  41,  39,  40,  41,  39,  40,  41,
-    73,  74,  75,  76,  77,  78, 255, 255,
+    73,  74,  75,  76,  77,  78,  81,  82,
    // 112-127
    42,  43,  44,  45,  46,  47,  48,  49,
    50,  51,  52,  53,  54,  55,  56,  57,
@@ -939,6 +941,28 @@ static const prog_Parameter parameters[kNumParameters] PROGMEM = {
     UNIT_STEAL_MODE, STEAL_OLDEST, STEAL_MODE_LAST - 1,
     1, 0, 0xff, 115,
     STR_RES_STL, STR_RES_VOICE_STEAL, STR_RES_PART },
+
+  // 81 (BAMBI): voice LFO trigger mode: free, env~lfo (each note restarts
+  // the cycle), once (one-shot: restart, hold after one cycle).
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_VOICE_LFO_MODE,
+    UNIT_VOICE_LFO_MODE, VOICE_LFO_MODE_FREE, VOICE_LFO_MODE_LAST - 1,
+    1, 0, 0xff, 116,
+    STR_RES_TRIGGER, STR_RES_TRIGGER, STR_RES_VOICE_LFO },
+
+  // 82 (BAMBI): voice LFO output slew.
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_VOICE_LFO_SLEW,
+    UNIT_UINT8, 0, 127,
+    1, 0, 0xff, 117,
+    STR_RES_SLEW, STR_RES_SLEW, STR_RES_VOICE_LFO },
+
+  // 83 (BAMBI): velocity curve (patch byte 30).
+  { PARAMETER_LEVEL_PATCH,
+    PRM_PATCH_VELOCITY_CURVE,
+    UNIT_VELOCITY_CURVE, VELOCITY_CURVE_LINEAR, VELOCITY_CURVE_LAST - 1,
+    1, 0, 0xff, 118,
+    STR_RES_VELO, STR_RES_VELO_CURVE, STR_RES_VOICE },
 };
 
 /* static */

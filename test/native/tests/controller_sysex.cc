@@ -14,6 +14,7 @@
 #include "controller/parameter.h"
 #include "controller/part.h"
 #include "controller/storage.h"
+#include "controller/ui.h"
 
 using namespace ambika;
 
@@ -107,7 +108,12 @@ TEST(SysExVersionReply) {
   CHECK(r.ok);
   CHECK_EQ(r.data.size(), 18);
   CHECK_EQ(r.data[0], 1);  // family: YAM+
+  CHECK_EQ(r.data[2], kYamPlusVersion);
+  CHECK_EQ(kYamPlusVersion, 0x04);  // BAMBI voice LFO modes, velocity curve
   CHECK_EQ(r.data[3], WAVEFORM_LAST);
+  CHECK_EQ(r.data[4], kPatchLayoutVersion);
+  CHECK_EQ(kPatchLayoutVersion, 2);  // patch bytes 30, 110, 111
+  CHECK_EQ(r.data[5], kPartLayoutVersion);
   for (uint8_t port = 0; port < 6; ++port) {
     uint8_t id = r.data[6 + 2 * port];
     uint8_t version = r.data[7 + 2 * port];
@@ -204,7 +210,7 @@ TEST(SysExShortForeignMessageDoesNotReplayLastCommand) {
   std::vector<uint8_t> patch = TestPatch(0);
   uint8_t sum = 0;
   for (size_t i = 0; i < patch.size(); ++i) sum += patch[i];
-  patch[offsetof(Patch, padding)] -= sum;  // make the checksum 0
+  patch[offsetof(Patch, env_lfo[1].padding)] -= sum;  // checksum 0 (unused byte)
   Send(Message(0x01, 1, &patch[0], patch.size()));
   CHECK(PatchOf(0) == patch);
   // Edit the cutoff by NRPN, then send the foreign message.
@@ -347,5 +353,95 @@ TEST(SysExValidPatchesAreNotModified) {
     Send(Message(0x01, 1, &patch[0], patch.size()));
     CHECK_MSG(PatchOf(0) == patch, "round %d: a valid patch was modified",
               round);
+  }
+}
+
+// --- BAMBI voice LFO mode / slew, velocity curve ----------------------------
+
+namespace {
+
+// True if voicecard |voice| was sent "write patch byte |address| = |value|".
+bool SentPatchByte(uint8_t voice, uint8_t address, uint8_t value) {
+  const std::vector<uint8_t>& b = native_env::VoicecardBytes(voice);
+  for (size_t i = 0; i + 2 < b.size(); ++i) {
+    if (b[i] == COMMAND_WRITE_PATCH_DATA && b[i + 1] == address &&
+        b[i + 2] == value) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+TEST(VoiceLfoAndVelocityNrpnReachTheVoicecards) {
+  native_env::Boot();
+  const uint8_t address[] = {
+    PRM_PATCH_VOICE_LFO_MODE, PRM_PATCH_VOICE_LFO_SLEW,
+    PRM_PATCH_VELOCITY_CURVE };
+  const uint8_t value[] = { VOICE_LFO_MODE_ONE_SHOT, 77, VELOCITY_CURVE_HARD };
+  for (int i = 0; i < 3; ++i) {
+    native_env::ClearSpi();
+    native_env::Nrpn(0, address[i], value[i]);
+    native_env::Run(4);
+    CHECK_MSG(PatchOf(0)[address[i]] == value[i], "NRPN %d: %d", address[i],
+              PatchOf(0)[address[i]]);
+    CHECK_MSG(SentPatchByte(0, address[i], value[i]),
+              "NRPN %d not forwarded", address[i]);
+  }
+}
+
+TEST(VoiceLfoAndVelocityCcScaleToTheirRanges) {
+  native_env::Boot();
+  // CC 116 voice LFO mode, 117 slew, 118 velocity curve (channel 1).
+  native_env::MidiIn3(0xb0, 116, 127);
+  native_env::MidiIn3(0xb0, 117, 64);
+  native_env::MidiIn3(0xb0, 118, 64);
+  native_env::Run(4);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VOICE_LFO_MODE], VOICE_LFO_MODE_ONE_SHOT);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VOICE_LFO_SLEW], 64);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VELOCITY_CURVE], VELOCITY_CURVE_SOFT);
+  native_env::MidiIn3(0xb0, 116, 0);
+  native_env::Run(4);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VOICE_LFO_MODE], VOICE_LFO_MODE_FREE);
+}
+
+TEST(VoiceLfoAndVelocityBytesAreSanitizedOnLoad) {
+  // A dump from another firmware with garbage in the new bytes: clamped to
+  // the parameter ranges. The still-unused env 2/3 padding bytes are left
+  // alone.
+  native_env::Boot();
+  std::vector<uint8_t> patch = TestPatch(5);
+  patch[PRM_PATCH_VOICE_LFO_MODE] = 200;
+  patch[PRM_PATCH_VOICE_LFO_SLEW] = 250;
+  patch[PRM_PATCH_VELOCITY_CURVE] = 99;
+  patch[offsetof(Patch, env_lfo[1].padding)] = 123;
+  Send(Message(0x01, 1, &patch[0], patch.size()));
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VOICE_LFO_MODE], VOICE_LFO_MODE_LAST - 1);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VOICE_LFO_SLEW], 127);
+  CHECK_EQ(PatchOf(0)[PRM_PATCH_VELOCITY_CURVE], VELOCITY_CURVE_LAST - 1);
+  CHECK_EQ(PatchOf(0)[offsetof(Patch, env_lfo[1].padding)], 123);
+  // A stock patch (zeros there) keeps the stock behaviour.
+  patch[PRM_PATCH_VOICE_LFO_MODE] = 0;
+  patch[PRM_PATCH_VOICE_LFO_SLEW] = 0;
+  patch[PRM_PATCH_VELOCITY_CURVE] = 0;
+  Send(Message(0x01, 1, &patch[0], patch.size()));
+  CHECK(PatchOf(0) == patch);
+}
+
+TEST(VoiceLfoPageFollowsTheVoiceLfoPage) {
+  PageInfo info;
+  ambika::ResourcesManager::Load(page_registry, PAGE_VOICE_LFO, &info);
+  CHECK_EQ(info.next_page, PAGE_VOICE_LFO_2);
+  ambika::ResourcesManager::Load(page_registry, PAGE_VOICE_LFO_2, &info);
+  CHECK_EQ(info.index, PAGE_VOICE_LFO_2);
+  CHECK_EQ(info.next_page, PAGE_ENV_LFO);
+  CHECK_EQ(info.group, 2);
+  const uint8_t expected[8] = { 32, 33, 81, 82, 83, 0xff, 0xff, 0xff };
+  for (int i = 0; i < 8; ++i) CHECK_EQ(info.data[i], expected[i]);
+  // Every registry entry sits at its own page number.
+  for (uint8_t page = 0; page <= PAGE_OS_INFO; ++page) {
+    ambika::ResourcesManager::Load(page_registry, page, &info);
+    CHECK_EQ(info.index, page);
   }
 }

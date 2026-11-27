@@ -69,7 +69,15 @@ const prog_PageInfo page_registry[] PROGMEM = {
   { PAGE_VOICE_LFO,
     &ParameterEditor::event_handlers_,
     { 80, 32, 33, 79, 75, 76, 77, 78 },
-    PAGE_ENV_LFO, 2, 0x0f,
+    PAGE_VOICE_LFO_2, 2, 0x0f,
+  },
+
+  // BAMBI: the whole voice LFO (rate and waveform repeated from the page
+  // before), and the velocity curve.
+  { PAGE_VOICE_LFO_2,
+    &ParameterEditor::event_handlers_,
+    { 32, 33, 81, 82, 83, 0xff, 0xff, 0xff },
+    PAGE_ENV_LFO, 2, 0xff,
   },
   
   { PAGE_MODULATIONS,
