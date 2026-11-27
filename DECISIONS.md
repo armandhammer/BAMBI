@@ -40,3 +40,32 @@ Newest last. Revisit any of them by opening an issue or reverting the commit.
 - **Tempo pot minimum is 39 (`ext`)**, not the out-of-range 38 the even-BPM
   rounding produced.
 
+
+## 2026-11-26 — unison stacks and vintage expansion (YAM+ 0.2-dev)
+
+- **Unison 3x/4x are new polyphony mode values 5 and 6**, after `chain`,
+  so stock patches and parts (0–4) keep their meaning. `2x unison` keeps
+  YAM's rounding (with an odd voice count the last note shares a voice
+  with the first); 3x/4x round down so stacks never overlap, and the
+  leftover voices stay silent. With six voices that means 4x plays one note.
+  Alternative considered: let the second 4x note use voices 5, 6, 1, 2,
+  which steals half of the first stack on every second note.
+- **No 6x unison mode**: `mono` with six voices already is one.
+- **No stereo pan spread**: the Ambika has no per-voice panning (each
+  voicecard has its own output and the mix bus is mono).
+- **Sub-octave voice is a spread mode (`sub-`)**, not a separate
+  parameter: it needs no new patch/part byte, and it only makes sense
+  together with the stack detune. In the polyphonic modes it falls back to
+  `cntr`, because every slot there is a different note.
+- **The unison, poly, cyclic and chain paths share one function
+  (`Part::SlotVoices`)**: needed to fit the controller flash (the first,
+  separate version cost 415 bytes and failed the 512-byte gate; this one
+  costs 158).
+- **Vintage keeps one knob.** Per-note slop, oscillator 2 drift and
+  resonance tolerance scale with the existing `vint` value instead of new
+  parameters: no patch-format change, and 0 is still exactly YAM. Existing
+  patches with vintage > 0 sound slightly livelier than on 0.1; 0.1 was a
+  pre-release that hasn't been tested on hardware, so no installed base
+  depends on the old amounts.
+- **Version numbers:** YAM+ 0.2 (`kYamPlusVersion` 0x02) and voicecard
+  0x12, so editors can offer the new values only to firmware that has them.

@@ -64,34 +64,41 @@ static inline uint16_t U14ToPwmCv(uint16_t value) {
 //
 // - Static "component tolerance" offsets, picked by the voice index the
 //   controller assigns to each voicecard slot: at vintage = 127, pitch up to
-//   +/-9 cents, cutoff up to +/-3 steps (of 128), envelope times up to
-//   +/-3 steps.
+//   +/-9 cents, cutoff up to +/-3 steps (of 128), resonance up to +/-2
+//   steps, envelope times up to +/-3 steps.
 // - Slow drift: a per-voice random walk (new target every 256 blocks, i.e.
 //   ~260 ms, smoothed with a ~130 ms time constant) adds up to +/-6 cents and
-//   +/-2 cutoff steps.
-// The drift uses its own generator seeded by the voice index, so voices
-// wander independently and the shared Random state (noise, random mod
+//   +/-2 cutoff steps. Oscillator 2 has its own walk (up to +/-6 cents
+//   against oscillator 1), so the two oscillators beat slowly.
+// - Per-note slop: every new (non-legato) note draws a pitch offset of up
+//   to +/-6 cents and an envelope time offset of -2..+1 steps, like the
+//   note-to-note inconsistency of a vintage poly.
+// The drift and slop use their own generator seeded by the voice index, so
+// voices wander independently and the shared Random state (noise, random mod
 // source) is untouched. vintage = 0 leaves everything as stock YAM.
 // -----------------------------------------------------------------------------
 
-static const prog_int8_t kVintageOffsets[8 * 3] PROGMEM = {
-  // pitch (1/128 st), cutoff (x32 CV units), envelope time (steps x2)
-    9,  -40,   1,
-   -7,   65,  -1,
-    3,  -90,   2,
-  -11,   25,   0,
-   12,   80,  -2,
-   -4,  -60,   1,
-    6,  100,  -1,
-   -9,  -15,   2,
+static const prog_int8_t kVintageOffsets[8 * 4] PROGMEM = {
+  // pitch (1/128 st), cutoff (x32 CV units), envelope time (steps x2),
+  // resonance (x32 CV units)
+    9,  -40,   1,   48,
+   -7,   65,  -1,  -64,
+    3,  -90,   2,   16,
+  -11,   25,   0,  -32,
+   12,   80,  -2,   64,
+   -4,  -60,   1,  -16,
+    6,  100,  -1,   32,
+   -9,  -15,   2,  -48,
 };
 
 static uint8_t voice_index;
 static uint16_t drift_rng = 0xace1;
-static int8_t drift_target;
+static int8_t drift_target[2];
 static uint8_t drift_counter;
-static int16_t drift;  // Smoothed drift, target << 6.
+static int16_t drift[2];  // Smoothed drift (osc 1+2, osc 2), target << 6.
+static uint16_t slop_random;  // Drawn at each new note.
 static int16_t vintage_pitch;  // Applied in RenderOscillators().
+static int8_t vintage_osc2_pitch;  // Applied to oscillator 2 only.
 
 /* static */
 void Voice::set_voice_index(uint8_t index) {
@@ -99,18 +106,32 @@ void Voice::set_voice_index(uint8_t index) {
   drift_rng = 0xace1 ^ U8U8Mul(index + 1, 0x3b);
 }
 
+/* static */
+int16_t Voice::debug_vintage_pitch(uint8_t osc) {
+  return vintage_pitch + (osc ? vintage_osc2_pitch : 0);
+}
+
+// xorshift16.
+static uint16_t NextDriftRandom() {
+  uint16_t x = drift_rng;
+  x ^= x << 7;
+  x ^= x >> 9;
+  x ^= x << 8;
+  drift_rng = x;
+  return x;
+}
+
 static inline void UpdateDrift() {
   if (++drift_counter == 0) {
-    // xorshift16.
-    uint16_t x = drift_rng;
-    x ^= x << 7;
-    x ^= x >> 9;
-    x ^= x << 8;
-    drift_rng = x;
-    drift_target = static_cast<int8_t>(x >> 8);
+    uint16_t x = NextDriftRandom();
+    drift_target[0] = static_cast<int8_t>(x >> 8);
+    drift_target[1] = static_cast<int8_t>(x);
   }
-  drift += ((static_cast<int16_t>(drift_target) << 6) - drift) >> 7;
+  for (uint8_t i = 0; i < 2; ++i) {
+    drift[i] += ((static_cast<int16_t>(drift_target[i]) << 6) - drift[i]) >> 7;
+  }
 }
+
 uint8_t Voice::buffer_[kAudioBlockSize];
 uint8_t Voice::osc2_buffer_[kAudioBlockSize];
 uint8_t Voice::sync_state_[kAudioBlockSize];
@@ -220,6 +241,7 @@ void Voice::Trigger(uint16_t note, uint8_t velocity, uint8_t legato) {
     modulation_sources_[MOD_SRC_VELOCITY] = velocity;
     modulation_sources_[MOD_SRC_RANDOM] = Random::state_msb();
     osc_2.Reset();
+    slop_random = NextDriftRandom();
   }
   if (pitch_value_ == 0 || (part_.legato && !legato)) {
     pitch_value_ = pitch_target_;
@@ -369,18 +391,25 @@ inline void Voice::ProcessModulationMatrix() {
 inline void Voice::UpdateDestinations() {
   // YAM+ vintage offsets (see kVintageOffsets).
   int16_t vintage_cutoff = 0;
+  int16_t vintage_resonance = 0;
   int8_t vintage_env = 0;
   vintage_pitch = 0;
+  vintage_osc2_pitch = 0;
   uint8_t vintage = patch_.vintage;
   if (vintage) {
-    const prog_int8_t* offsets = kVintageOffsets + (voice_index & 7) * 3;
+    const prog_int8_t* offsets = kVintageOffsets + (voice_index & 7) * 4;
     UpdateDrift();
-    int8_t wander = drift >> 6;
+    int8_t wander = drift[0] >> 6;
     vintage_pitch = (S8U8Mul(pgm_read_byte(offsets), vintage) >> 7) +
-        (S8U8Mul(wander, vintage) >> 11);
+        (S8U8Mul(wander, vintage) >> 11) +
+        (S8U8Mul(static_cast<int8_t>(slop_random >> 8), vintage) >> 11);
+    vintage_osc2_pitch = S8U8Mul(static_cast<int8_t>(drift[1] >> 6),
+        vintage) >> 11;
     vintage_cutoff = (S8U8Mul(pgm_read_byte(offsets + 1), vintage) >> 5) +
         (S8U8Mul(wander, vintage) >> 6);
-    vintage_env = S8U8Mul(pgm_read_byte(offsets + 2), vintage) >> 6;
+    vintage_env = (S8U8Mul(pgm_read_byte(offsets + 2), vintage) >> 6) +
+        (S8U8Mul(static_cast<int8_t>(slop_random), vintage) >> 13);
+    vintage_resonance = S8U8Mul(pgm_read_byte(offsets + 3), vintage) >> 5;
   }
 
   // Hardcoded filter modulations.
@@ -406,6 +435,7 @@ inline void Voice::UpdateDestinations() {
 #else
   uint16_t resonance = dst_[MOD_DST_FILTER_RESONANCE];
 #endif
+  resonance = S16ClipU14(resonance + vintage_resonance);
   modulation_destinations_[MOD_DST_FILTER_RESONANCE] = U14ShiftRight6(
       resonance);
   cutoff_cv_ = U14ToPwmCv(cutoff);
@@ -468,6 +498,9 @@ inline void Voice::RenderOscillators() {
     }
     // -1 / +1 semitones by the detune controller.
     pitch += patch_.osc[i].detune;
+    if (i) {
+      pitch += vintage_osc2_pitch;
+    }
     // -16 / +16 semitones by the routed modulations.
     pitch += (dst_[MOD_DST_OSC_1 + i] - 8192) >> 2;
 
