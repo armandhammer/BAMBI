@@ -81,6 +81,7 @@ enum UiPageNumber {
   
   PAGE_ENV_LFO,
   PAGE_VOICE_LFO,
+  PAGE_VOICE_LFO_2,  // BAMBI
   
   PAGE_MODULATIONS,
   
@@ -154,6 +155,9 @@ struct PageInfo {
 };
 
 typedef PageInfo PROGMEM prog_PageInfo;
+
+// Indexed by UiPageNumber (ui.cc).
+extern const prog_PageInfo page_registry[];
 
 class Ui {
  public:

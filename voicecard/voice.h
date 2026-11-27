@@ -113,6 +113,10 @@ class Voice {
   // last block. For the native tests; not linked into the firmware.
   static int16_t debug_vintage_pitch(uint8_t osc);
 
+  // BAMBI: the velocity mod source value for a note velocity (0-254), shaped
+  // by the patch's velocity curve.
+  static uint8_t ApplyVelocityCurve(uint8_t velocity);
+
  private:
   static inline void LoadSources() __attribute__((always_inline));
   static inline void ProcessModulationMatrix() __attribute__((always_inline));

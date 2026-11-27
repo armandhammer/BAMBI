@@ -66,6 +66,8 @@ void RandomPatch() {
     p.env_lfo[i].retrigger_mode = R(LFO_SYNC_MODE_LAST);
   }
   p.voice_lfo_shape = R(LFO_WAVEFORM_LAST);
+  p.voice_lfo_mode = R(VOICE_LFO_MODE_LAST);
+  p.env_lfo[0].padding = R(VELOCITY_CURVE_LAST);  // velocity curve
   for (int i = 0; i < kNumModulations; ++i) {
     p.modulation[i].source = R(MOD_SRC_LAST);
     p.modulation[i].destination = R(MOD_DST_LAST);

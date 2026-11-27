@@ -95,3 +95,50 @@ Newest last. Revisit any of them by opening an issue or reverting the commit.
   193, and SysEx part dumps carry it.
 - **Version numbers:** YAM+ 0.3 (`kYamPlusVersion` 0x03), part layout 2.
   Cost: 146 B controller flash, no RAM.
+
+
+## 2026-11-26 — voice LFO trigger/slew and velocity curve (YAM+ 0.4-dev)
+
+- **Parameter captions on 8 bits first (separate commit).** The controller
+  had 560 B free (gate 512); three parameters, a page and their strings cost
+  ~116 B. Instead of removing anything, the parameter table now stores its
+  three caption string ids as `uint8_t` (they were 16-bit), saving 243 B of
+  table for a few 2-byte string aliases. Repeated strings only cost a
+  pointer (the resource compiler shares the text), so the old "duplicate
+  strings" idea for freeing flash would not have saved anything. A golden
+  test checks every caption and value text; the native build fails if a
+  caption id reaches 256. Net: controller 676 B free after this feature.
+- **Everything runs on the voicecard.** The voice LFO is per voice; the
+  velocity curve is applied to the velocity mod source when a note is
+  triggered (so it covers all matrix routings and `velo~vcf` at once). The
+  controller only gains table entries, a page and strings. `common/lfo.h`
+  (shared with the part LFOs on the controller) is untouched: the modes and
+  slew live in `voice.cc`.
+- **Trigger values reuse the part LFO vocabulary**: `free` / `env~lfo`
+  mean the same as on the ENV/LFO page's `trigger`; `once` is the one-shot.
+  The first two are aliases of existing strings (2 B each). `lfo~env`
+  (retrigger the envelopes) is not offered for the voice LFO.
+- **One-shot holds the last value of its first cycle** (ramp ~255, square
+  255, triangle ~255, S&H the value drawn at the note) rather than jumping
+  to the start-of-cycle value, so `ramp` + `once` works as an attack-only
+  envelope. Switching to `once` mid-note holds the current value until the
+  next note.
+- **Slew applies to every waveform**, not only S&H: it is the same lag, and
+  rounding the square is useful. Coefficients come from the existing
+  portamento table (no new LUT). The step is never rounded to 0, so the
+  output always reaches the target exactly.
+- **Velocity curve: three named curves, as asked**, `x(x+1)/256` and its
+  mirror: endpoints fixed (0 -> 0, 255 -> 255), half velocity -> 25% /
+  75%. Stored in `env_lfo[0].padding` (patch byte 30): bytes 110-111 went
+  to the LFO, and the envelope padding bytes were never written by stock
+  firmware (0 = linear). An out-of-range byte from an unsanitized source
+  acts as linear on the voicecard; the controller clamps on load anyway.
+- **A third page in the ENV/LFO group** rather than squeezing into the
+  filter page's single free slot: the voice LFO page is full, and repeating
+  `rate`/`wave` there makes the new page a complete voice LFO editor. The
+  existing pages keep their layout.
+- **CC 116-118** (undefined in the MIDI spec, after YAM+'s 110-115), NRPN
+  110, 111, 30.
+- **Version numbers:** YAM+ 0.4 (`kYamPlusVersion` 0x04), patch layout 2,
+  voicecard 0x13. Flash: controller 676 B free (was 560 before the caption
+  change), voicecard 4228 B free (-320 B).

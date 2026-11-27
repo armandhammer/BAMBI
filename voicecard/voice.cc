@@ -132,6 +132,41 @@ static inline void UpdateDrift() {
   }
 }
 
+// -----------------------------------------------------------------------------
+// BAMBI voice LFO modes and slew, velocity curve.
+//
+// - Mode (patch byte 110): free running (stock), retrigger (each new,
+//   non-legato note restarts the cycle and draws a new S&H value) or one-shot
+//   (like retrigger, then the LFO holds the last value of its first cycle
+//   until the next note: a per-voice AD-like or random-per-note source).
+// - Slew (patch byte 111): one-pole lag on the LFO output, 0 = off. Uses the
+//   portamento rate table as coefficients: ~3 ms at 1, ~0.5 s at 64, ~2.6 s
+//   at 96. Smooths S&H steps and square edges.
+// - Velocity curve (patch byte 30): shapes the velocity mod source (all mod
+//   matrix routings and velo~vcf): linear, soft (concave) or hard (convex).
+// The voice LFO's Lfo object is shared code with the controller's part LFOs,
+// so all of this lives here rather than in common/lfo.h.
+// -----------------------------------------------------------------------------
+
+static uint8_t lfo_cycles_left;  // Phase wraps until a one-shot LFO holds.
+static uint8_t lfo_value;  // Last value before slew (held by one-shot).
+static uint16_t lfo_slewed;  // Slewed value, 8.8.
+
+static inline uint8_t ShapeVelocity(uint8_t velocity, uint8_t curve) {
+  if (curve == VELOCITY_CURVE_LINEAR || curve >= VELOCITY_CURVE_LAST) {
+    return velocity;
+  }
+  // x * (x + 1) / 256 maps 0 -> 0 and 255 -> 255.
+  uint8_t x = curve == VELOCITY_CURVE_HARD ? velocity : ~velocity;
+  x = (U8U8Mul(x, x) + x) >> 8;
+  return curve == VELOCITY_CURVE_HARD ? x : ~x;
+}
+
+/* static */
+uint8_t Voice::ApplyVelocityCurve(uint8_t velocity) {
+  return ShapeVelocity(velocity, patch_.env_lfo[0].padding);
+}
+
 uint8_t Voice::buffer_[kAudioBlockSize];
 uint8_t Voice::osc2_buffer_[kAudioBlockSize];
 uint8_t Voice::sync_state_[kAudioBlockSize];
@@ -200,6 +235,9 @@ void Voice::Init() {
   part_.volume = 127;
   part_.portamento_time = 0;
   part_.legato = 0;
+  lfo_cycles_left = 0;
+  lfo_value = 0;
+  lfo_slewed = 0;
   Kill();
 }
 
@@ -238,10 +276,16 @@ void Voice::Trigger(uint16_t note, uint8_t velocity, uint8_t legato) {
     gate_ = 255;
     TriggerEnvelope(ATTACK);
     transient_generator.Trigger();
-    modulation_sources_[MOD_SRC_VELOCITY] = velocity;
+    modulation_sources_[MOD_SRC_VELOCITY] = ApplyVelocityCurve(velocity);
     modulation_sources_[MOD_SRC_RANDOM] = Random::state_msb();
     osc_2.Reset();
     slop_random = NextDriftRandom();
+    if (patch_.voice_lfo_mode != VOICE_LFO_MODE_FREE) {
+      // The next Render() wraps the phase to ~0: the cycle restarts and the
+      // S&H draws a new value. A one-shot holds at the wrap after that.
+      voice_lfo_.set_phase(0xffff);
+      lfo_cycles_left = 2;
+    }
   }
   if (pitch_value_ == 0 || (part_.legato && !legato)) {
     pitch_value_ = pitch_target_;
@@ -278,8 +322,30 @@ inline void Voice::LoadSources() {
   modulation_sources_[MOD_SRC_ENV_3] = envelope_[2].Render();
   modulation_sources_[MOD_SRC_NOTE] = U14ShiftRight6(pitch_value_);
   modulation_sources_[MOD_SRC_GATE] = gate_;
-  modulation_sources_[MOD_SRC_LFO_4] = voice_lfo_.Render(
-      patch_.voice_lfo_shape);
+  uint8_t one_shot = patch_.voice_lfo_mode == VOICE_LFO_MODE_ONE_SHOT;
+  if (!one_shot || lfo_cycles_left) {
+    uint8_t value = voice_lfo_.Render(patch_.voice_lfo_shape);
+    if (voice_lfo_.looped() && lfo_cycles_left) {
+      --lfo_cycles_left;
+    }
+    if (!one_shot || lfo_cycles_left) {
+      lfo_value = value;
+    }
+  }
+  uint8_t slew = patch_.voice_lfo_slew;
+  if (slew) {
+    uint16_t coefficient = ResourcesManager::Lookup<uint16_t, uint8_t>(
+        lut_res_env_portamento_increments, slew & 0x7f);
+    int32_t delta = static_cast<int32_t>(lfo_value * 256U) - lfo_slewed;
+    int16_t step = (delta * coefficient) >> 16;
+    if (step == 0 && delta) {
+      step = delta > 0 ? 1 : -1;
+    }
+    lfo_slewed += step;
+  } else {
+    lfo_slewed = lfo_value * 256U;
+  }
+  modulation_sources_[MOD_SRC_LFO_4] = lfo_slewed >> 8;
 
   // Apply the modulation operators
   for (uint8_t i = 0; i < kNumModifiers; ++i) {

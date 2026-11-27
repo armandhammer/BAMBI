@@ -51,6 +51,8 @@ static const prog_char str_res_vintage[] PROGMEM = "vintage";
 static const prog_char str_res_voice[] PROGMEM = "voice";
 static const prog_char str_res_stl[] PROGMEM = "stl";
 static const prog_char str_res_voice_steal[] PROGMEM = "voice steal";
+static const prog_char str_res_slew[] PROGMEM = "slew";
+static const prog_char str_res_velo_curve[] PROGMEM = "velo curve";
 static const prog_char str_res_oscillator_1[] PROGMEM = "oscillator 1";
 static const prog_char str_res_oscillator_2[] PROGMEM = "oscillator 2";
 static const prog_char str_res_mixer[] PROGMEM = "mixer";
@@ -311,6 +313,10 @@ static const prog_char str_res_chain[] PROGMEM = "chain";
 static const prog_char str_res_3x_unison[] PROGMEM = "3x unison";
 static const prog_char str_res_4x_unison[] PROGMEM = "4x unison";
 static const prog_char str_res_old[] PROGMEM = "old";
+static const prog_char str_res_once[] PROGMEM = "once";
+static const prog_char str_res_lin[] PROGMEM = "lin";
+static const prog_char str_res_soft[] PROGMEM = "soft";
+static const prog_char str_res_hard[] PROGMEM = "hard";
 static const prog_char str_res_up[] PROGMEM = "up";
 static const prog_char str_res_down[] PROGMEM = "down";
 static const prog_char str_res_up_down[] PROGMEM = "up&down";
@@ -430,6 +436,8 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_voice,
   str_res_stl,
   str_res_voice_steal,
+  str_res_slew,
+  str_res_velo_curve,
   str_res_oscillator_1,
   str_res_oscillator_2,
   str_res_mixer,
@@ -719,6 +727,12 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_low,
   str_res_high,
   str_res_none,
+  str_res_free,
+  str_res_envTlfo,
+  str_res_once,
+  str_res_lin,
+  str_res_soft,
+  str_res_hard,
   str_res_up,
   str_res_down,
   str_res_up_down,

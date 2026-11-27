@@ -56,6 +56,8 @@ enum Unit {
   UNIT_MIDI_CHANNEL,
   UNIT_SPREAD_MODE,  // YAM+
   UNIT_STEAL_MODE,  // BAMBI
+  UNIT_VOICE_LFO_MODE,  // BAMBI
+  UNIT_VELOCITY_CURVE,  // BAMBI
   UNIT_LAST
 };
 
@@ -121,7 +123,7 @@ struct Parameter {
   static void PrintNote(uint8_t note, char* buffer);
 };
 
-const uint8_t kNumParameters = 81;
+const uint8_t kNumParameters = 84;
 typedef Parameter PROGMEM prog_Parameter;
 
 // The parameter manager is the class who knows how to apply a parameter change

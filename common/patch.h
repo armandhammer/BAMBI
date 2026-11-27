@@ -44,6 +44,8 @@ struct EnvelopeLfoSettings {
   uint8_t release;
   uint8_t shape;
   uint8_t rate;
+  // BAMBI: in env_lfo[0] (patch offset 30) this is the velocity curve, see
+  // VelocityCurve. Still unused (0) in env_lfo[1] and env_lfo[2].
   uint8_t padding;
   uint8_t retrigger_mode;
 };
@@ -162,6 +164,22 @@ enum LfoSyncMode {
   LFO_SYNC_MODE_SLAVE,
   LFO_SYNC_MODE_MASTER,
   LFO_SYNC_MODE_LAST
+};
+
+// BAMBI: patch byte 110.
+enum VoiceLfoMode {
+  VOICE_LFO_MODE_FREE,  // Free running (stock).
+  VOICE_LFO_MODE_RETRIGGER,  // Phase reset by each new (non-legato) note.
+  VOICE_LFO_MODE_ONE_SHOT,  // Reset by each note, holds after one cycle.
+  VOICE_LFO_MODE_LAST
+};
+
+// BAMBI: patch byte 30. Applied by the voicecard to the velocity mod source.
+enum VelocityCurve {
+  VELOCITY_CURVE_LINEAR,  // Stock.
+  VELOCITY_CURVE_SOFT,  // Concave (log-like): more output from soft playing.
+  VELOCITY_CURVE_HARD,  // Convex (exp-like): needs a firmer touch.
+  VELOCITY_CURVE_LAST
 };
 
 enum ModulationSource {
@@ -291,8 +309,11 @@ struct Patch {
   // Offset: 109 (YAM+). Per-voice analog drift/variance amount, 0 = off.
   uint8_t vintage;
 
-  // Offset: 110-112
-  uint8_t padding[2];
+  // Offset: 110 (BAMBI). Voice LFO trigger mode, see VoiceLfoMode.
+  uint8_t voice_lfo_mode;
+
+  // Offset: 111 (BAMBI). Voice LFO output slew (one-pole lag), 0 = off.
+  uint8_t voice_lfo_slew;
 };
 
 typedef Patch PROGMEM prog_Patch;
@@ -350,7 +371,12 @@ enum PatchParameter {
 
   // YAM+
   PRM_PATCH_ENV_CURVE = 106,  // 106..108
-  PRM_PATCH_VINTAGE = 109
+  PRM_PATCH_VINTAGE = 109,
+
+  // BAMBI
+  PRM_PATCH_VELOCITY_CURVE = 30,  // env_lfo[0].padding
+  PRM_PATCH_VOICE_LFO_MODE = 110,
+  PRM_PATCH_VOICE_LFO_SLEW = 111
 };
 
 }  // namespace ambika

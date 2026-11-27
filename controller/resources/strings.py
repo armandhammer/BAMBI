@@ -54,6 +54,8 @@ vintage
 voice
 stl
 voice steal
+slew
+velo curve
 oscillator 1
 oscillator 2
 mixer
@@ -357,6 +359,12 @@ old
 low
 high
 none
+free
+env~lfo
+once
+lin
+soft
+hard
 
 up
 down

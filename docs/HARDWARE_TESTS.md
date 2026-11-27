@@ -288,3 +288,47 @@ patch with a long release so you can hear which voice gets cut.
 
 **Please send back:** whether refusing the out-of-priority note in Q2/Q3
 feels right while playing, or whether you'd rather have it steal anyway.
+
+
+## BAMBI 0.4-dev: voice LFO trigger/slew, velocity curve
+
+Flash `bambi-lfo-velo` on the controller **and all six voicecards** (the
+voicecards report v1.3). The OS-info page shows YAM+ 0.4. Use a simple
+patch: one saw, filter half open, and a matrix slot `lfo4 -> freq` (or
+`lfo4 -> osc1` for pitch) at a clearly audible amount.
+
+### R. Voice LFO trigger, slew; velocity curve (20 min)
+1. [ ] Every page keeps its old layout. Press the ENV/LFO group button
+   three times: the third page shows `rate wave trig slew` on top and
+   `velo` below. `rate`/`wave` are the same settings as on the voice LFO
+   page (change one, the other follows). Old patches load as `trig free`,
+   `slew 0`, `velo lin` and sound exactly as before.
+2. [ ] `trig free`, slow rate, `ramp`: repeated notes catch the sweep at
+   random points (stock behaviour).
+3. [ ] `trig env~lfo`: every note starts the sweep from the bottom. With
+   `legato on` and overlapping notes, the sweep continues (no restart).
+   With `wave s&h`, each note gets a different random value.
+4. [ ] `trig once`, `ramp`: each note sweeps up once and then stays up
+   (no wrap back down). Hold a long note to check it never restarts on its
+   own. Rate changes the sweep time.
+5. [ ] `trig once`, `s&h`: each note has its own fixed random cutoff/pitch
+   for its whole length; play a chord and hear six different values.
+6. [ ] `trig once`, `sqr`: the step happens once, half a cycle after the
+   note, then holds.
+7. [ ] `slew`: with `s&h` free running, raise `slew` from 0: the steps
+   turn into glides; around 60-90 the movement becomes slow and smooth.
+   With `sqr` the edges round off. No clicks or zipper noise at any
+   setting, and with `slew 0` it sounds exactly like before.
+8. [ ] `velo`: route `velo -> vca` (or use `velo~vcf`). Play softly and
+   hard with each curve: `soft` makes soft playing louder/brighter, `hard`
+   needs a firmer touch for the same level; full velocity sounds the same
+   in all three.
+9. [ ] SysEx/NRPN: send NRPN 110 = 2, 111 = 64, 30 = 1 (or CC 116/117/118)
+   and see the page follow. Save the patch, reload it: the settings stick.
+10. [ ] Mixed versions: an old voicecard (v1.2 or stock) with this
+    controller plays the patch with a free-running LFO, no slew, linear
+    velocity (nothing else changes).
+
+**Please send back:** whether `slew` covers a useful range (too fast/slow
+at the top?), and whether `soft`/`hard` are strong enough or should be
+steeper.
