@@ -332,3 +332,36 @@ patch: one saw, filter half open, and a matrix slot `lfo4 -> freq` (or
 **Please send back:** whether `slew` covers a useful range (too fast/slow
 at the top?), and whether `soft`/`hard` are strong enough or should be
 steeper.
+
+
+## BAMBI 0.4-dev: SVF voicecard audit (voicecards only)
+
+Flash `bambi-svf-audit` on all six voicecards (the controller is the same
+as `bambi-lfo-velo`). Audible changes to listen for: no click when the
+filter mode changes on a held note, and fewer clicks on fast envelopes when
+the voicecard is busy. Everything else should sound exactly as before.
+
+### S. SVF mode switching, CV smoothing (15 min)
+1. [ ] Hold a bright saw chord (cutoff ~60, resonance ~30). Step the filter
+   mode LP -> BP -> HP -> notch and back with the encoder while holding:
+   each change is a very short dip (~1-2 ms) instead of a click or thump.
+   Compare with `bambi-lfo-velo` voicecards if you want an A/B.
+2. [ ] With no note held, change the mode, then play: the first note has
+   the new mode from its start (no dip, no wrong-mode blip).
+3. [ ] Load patches with different filter modes while holding a note (Library
+   page): the switch is clean, no thump.
+4. [ ] Resonance sweep 0 -> 63 on each mode, at a low and a high note:
+   smooth, no jumps; self-oscillation behaviour the same as before.
+5. [ ] Heavy patch (both oscillators `fm` or wavetables, sub osc, fuzz,
+   crush, 4-voice chord) with a fast env 2 -> VCA (attack 0, decay ~20,
+   sustain 0) retriggered quickly: no new clicks; if the old firmware
+   clicked occasionally here, it should now be gone. Check the OS-info
+   page `ld`/`u` numbers stay as before (load should be slightly lower).
+6. [ ] Cutoff at 127 with env 2 -> VCF and LFO 2 -> VCF at maximum: the
+   filter stays open (no sudden close = no wrap); at 0 with everything
+   negative it stays closed.
+7. [ ] Log VCA jumper (if fitted on any voicecard): mode changes on held
+   notes dip to silence too (not to full volume).
+
+**Please send back:** whether the mode-change dip is short enough to be
+inaudible in normal playing, or whether you'd rather keep the instant switch.
