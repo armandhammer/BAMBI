@@ -94,6 +94,13 @@ bottom row: `velo`. All are patch settings, applied by each voicecard.
   applies to every velocity routing in the matrix and to `velo~vcf`.
   Existing patches load as `lin`.
 
+### SVF voicecard fixes (0.4)
+- Changing the filter mode on a sounding voice no longer clicks: the VCA dips
+  for 1-2 ms around the switch. A silent voice switches at once.
+- The control-voltage smoothing no longer steps when the voicecard is busy
+  (fewer clicks on fast envelopes), and costs fewer CPU cycles.
+- A corrupt filter mode byte can no longer select an unused filter input.
+
 ### Faster editing
 - Encoder acceleration: turning quickly moves values ×2/×4 (page navigation
   is not accelerated). Shift(S1)+encoder ×8 still works.

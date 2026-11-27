@@ -142,3 +142,48 @@ Newest last. Revisit any of them by opening an issue or reverting the commit.
 - **Version numbers:** YAM+ 0.4 (`kYamPlusVersion` 0x04), patch layout 2,
   voicecard 0x13. Flash: controller 676 B free (was 560 before the caption
   change), voicecard 4228 B free (-320 B).
+
+
+## 2026-11-26 — SVF voicecard audit (YAM+ 0.4-dev, voicecard only)
+
+Audited the SVF voicecard's control paths (`voicecard.cc`) and the DSP that
+feeds them (`voice.cc`): filter mode selection, cutoff/resonance CV scaling
+and clipping, the YAM+ CV ramps, VCA gain staging, crush and the mixer.
+
+Found and fixed:
+- **CV ramps stepped when a block came early.** A new ramp's step was
+  computed from the previous *target*; if the ISR hadn't finished the
+  previous ramp (the main loop catching up after a slow block), the
+  unfinished part was applied in one go at the end of the new ramp. On the
+  VCA that is a click (a 4000 -> 2000 retarget after 3 of 8 steps stepped
+  by over 1000 DAC units in the native reference). Ramps now start from the
+  ISR's current value, and an unchanged VCA level no longer cuts a running
+  ramp short (it used to jump straight to the target).
+- **32-bit division in the main loop.** The ramp step used an int32
+  division (`__divmodsi4`, ~600 cycles, three per block). It is now a 16-bit
+  shift with the sign handled separately (truncates towards zero, so the
+  ramp never passes its target), cheap enough to run with interrupts off.
+  No 32-bit division is left in the voicecard; ~1800 fewer cycles per block.
+- **Filter mode not masked.** YAM read `filter_mode_bytes[mode]` (a 4-byte
+  identity table in RAM) and wrote the result unmasked to PORTC: a corrupt
+  mode byte (stock controller, unsanitized dump) selected unused mux inputs
+  and wrote PORTC's other pins. Now `mode & 3`, and the table is gone.
+- **Mode changes clicked on a sounding voice.** Switching the SVF output
+  (LP/BP/HP/notch have different levels and DC offsets) while the VCA is
+  open jumps the signal. Now the VCA ramps to 0, the mode switches once the
+  ramp has finished (~1-2 ms), and the VCA ramps back. A silent voice
+  switches at once; patch loads on held notes get the same treatment. The
+  declicker works on the voice's VCA level, before the log/linear DAC
+  conversion (with the log VCA jumper, DAC 0 is full gain).
+
+Checked, no change needed (regression tests added): cutoff clips at both
+ends with every hardwired and matrix modulation at its extreme (no 16-bit
+wrap, including AVR 16-bit `int` promotion); vintage tolerance is applied
+after the clip by design, so a slot's range is shifted by up to 3/128 at
+the ends; resonance 0-63 maps to PWM 0-252/255 and modulation to 0xff00;
+crush divider stays 1-64; VCA DAC values stay <= 4064 (linear) / table
+range (log); the mixer can't wrap (all mixing is `U8Mix`). `filter[1]`
+(filter 2 settings) is not used by the SVF voicecard.
+
+No version change: these are voicecard fixes inside the unreleased 0.4-dev
+(voicecard still reports 0x13). Voicecard 4202 B flash free, 975 B RAM.
