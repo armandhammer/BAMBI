@@ -21,6 +21,8 @@
 
 #include <string.h>
 
+#include "controller/part.h"
+
 namespace ambika {
   
 void VoiceAllocator::Clear() {
@@ -34,7 +36,19 @@ void VoiceAllocator::ClearNotes() {
   memset(pool_, 0, size_);
 }
 
-uint8_t VoiceAllocator::NoteOn(uint8_t note) {
+// BAMBI: rank of a note for stealing - the held note with the lowest rank
+// loses its voice. All notes rank 0 in STEAL_OLDEST, so the scan below keeps
+// the least recently played one, as in YAM.
+static uint8_t StealRank(uint8_t note, uint8_t steal_mode) {
+  if (steal_mode == STEAL_LOWEST) {
+    return note;
+  } else if (steal_mode == STEAL_HIGHEST) {
+    return 0x7f - note;
+  }
+  return 0;
+}
+
+uint8_t VoiceAllocator::NoteOn(uint8_t note, uint8_t steal_mode) {
   if (size_ == 0) {
     return 0xff;
   }
@@ -56,12 +70,27 @@ uint8_t VoiceAllocator::NoteOn(uint8_t note) {
         }
       }
     }
-    // If all voices are active, use the least recently played note.
+    // If all voices are active, steal one (BAMBI: see StealMode). lru_ runs
+    // from the most to the least recently touched voice, so ties go to the
+    // least recently played note.
     if (voice == 0xff) {
+      if (steal_mode >= STEAL_NONE) {
+        return 0xff;
+      }
+      uint8_t lowest_rank = 0xff;
       for (uint8_t i = 0; i < size_; ++i) {
-        if (lru_[i] < size_) {
-          voice = lru_[i];
+        uint8_t candidate = lru_[i];
+        if (candidate < size_) {
+          uint8_t rank = StealRank(pool_[candidate] & 0x7f, steal_mode);
+          if (rank <= lowest_rank) {
+            lowest_rank = rank;
+            voice = candidate;
+          }
         }
+      }
+      // The new note would be the first one stolen: don't play it.
+      if (StealRank(note, steal_mode) < lowest_rank) {
+        return 0xff;
       }
     }
   } else {

@@ -115,8 +115,12 @@ struct PartData {
   // Offset: 80 (YAM+): SpreadMode, how "spread" detunes stacked voices.
   uint8_t spread_mode;
   
-  // Offset: 81-84
-  uint8_t padding[3];
+  // Offset: 81 (BAMBI): StealMode, which note loses its voice when a new
+  // note finds every voice of a polyphonic mode held.
+  uint8_t steal_mode;
+  
+  // Offset: 82-84
+  uint8_t padding[2];
   
   uint8_t step_value(uint8_t sequence, uint8_t step) const {
     return sequence_data[(step + (sequence << 4)) & 0x1f];
@@ -198,7 +202,9 @@ enum PartParameter {
   PRM_PART_POLYPHONY_MODE,
   
   // YAM+
-  PRM_PART_SPREAD_MODE = sizeof(Patch) + 80
+  PRM_PART_SPREAD_MODE = sizeof(Patch) + 80,
+  // BAMBI
+  PRM_PART_STEAL_MODE
 };
 
 enum SpreadMode {
@@ -207,6 +213,19 @@ enum SpreadMode {
   SPREAD_MODE_WIDE,
   SPREAD_MODE_SUB,
   SPREAD_MODE_LAST
+};
+
+// BAMBI: voice stealing in POLY / CHAIN / unison modes (CYCLIC always
+// rotates). Released voices are reused first, as in YAM; these choose which
+// held note is cut when there are none.
+enum StealMode {
+  STEAL_OLDEST,   // YAM: the least recently played note.
+  STEAL_LOWEST,   // The lowest note; a new note below every held note is
+                  // not played (high-note priority, keeps the melody).
+  STEAL_HIGHEST,  // The highest note; a new note above every held note is
+                  // not played (low-note priority, keeps the bass).
+  STEAL_NONE,     // Never steal: the new note is not played.
+  STEAL_MODE_LAST
 };
 
 class Part {

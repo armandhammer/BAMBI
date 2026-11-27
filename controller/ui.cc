@@ -68,7 +68,7 @@ const prog_PageInfo page_registry[] PROGMEM = {
   
   { PAGE_VOICE_LFO,
     &ParameterEditor::event_handlers_,
-    { 0xff, 32, 33, 79, 75, 76, 77, 78 },
+    { 80, 32, 33, 79, 75, 76, 77, 78 },
     PAGE_ENV_LFO, 2, 0x0f,
   },
   

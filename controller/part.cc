@@ -128,8 +128,10 @@ static const prog_PartData init_part PROGMEM = {
   // Spread mode (YAM+): new parts use centered spread.
   SPREAD_MODE_CENTER,
   
+  // Voice steal mode (BAMBI).
+  STEAL_OLDEST,
+  
   // Padding
-  0,
   0,
   0,
 };
@@ -746,7 +748,12 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
     // Prevent the same note to be allocated twice on two different voices.
     uint8_t voice_index = poly_allocator_.FindActive(note);
     if (voice_index == 0xff) {
-      voice_index = poly_allocator_.NoteOn(note);
+      voice_index = poly_allocator_.NoteOn(note, data_.steal_mode);
+      // BAMBI: a note the steal mode refuses is neither played here nor
+      // forwarded down the chain.
+      if (voice_index == 0xff) {
+        return;
+      }
     }
     uint8_t count;
     voice_index = SlotVoices(voice_index, &count);

@@ -330,6 +330,12 @@ cyclic
 chain
 3x unison
 4x unison
+stl
+voice steal
+old
+low
+high
+none
 
 up
 down

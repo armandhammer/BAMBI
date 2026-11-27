@@ -268,6 +268,21 @@ TEST(SysExMultiDumpRoundTrip) {
   CHECK_EQ(multi.data().clock_bpm, 133);
 }
 
+TEST(SysExPartDataIsClamped) {
+  // Part settings (0x05) go through the same clamp: a steal or spread mode
+  // past the end of its list would index past the value strings.
+  native_env::Boot();
+  const uint8_t* raw = multi.part(0).raw_data();
+  std::vector<uint8_t> part(raw, raw + sizeof(PartData));
+  part[offsetof(PartData, steal_mode)] = 0x55;
+  part[offsetof(PartData, spread_mode)] = 9;
+  part[offsetof(PartData, legato)] = 1;
+  Send(Message(0x05, 1, &part[0], part.size()));
+  CHECK(multi.part(0).data().steal_mode < STEAL_MODE_LAST);
+  CHECK(multi.part(0).data().spread_mode < SPREAD_MODE_LAST);
+  CHECK_EQ(multi.part(0).data().legato, 1);
+}
+
 TEST(SysExOutOfRangePatchValuesAreClamped) {
   // A patch dump with values outside the parameter ranges (another firmware,
   // a corrupt file, an editor bug) must not reach the voicecards as is: an

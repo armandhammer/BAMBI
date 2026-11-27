@@ -254,3 +254,37 @@ YAM.
 
 **Please send back:** the `ld` readings from P16, and whether the vintage
 amounts in P12–P15 feel too subtle, right, or too strong at 127.
+
+## BAMBI 0.3-dev: voice steal modes
+
+Flash `bambi-voice-steal` (controller only; the voicecards don't change).
+The OS-info page shows YAM+ 0.3. Part 1 with all six voices, `poly`, a
+patch with a long release so you can hear which voice gets cut.
+
+### Q. Voice steal (10 min)
+1. [ ] Voice LFO page, top row, knob 1 shows `stl` with `old`. Old parts
+   and multis load as `old` and play exactly as before (hold six notes,
+   a seventh cuts the first one you played).
+2. [ ] `stl low`: hold a six-note chord, then play a melody above it. Each
+   melody note cuts the lowest chord note; the top of the chord and the
+   melody keep sounding. A note below the whole chord does not sound.
+3. [ ] `stl high`: hold a six-note chord, then play notes below it. Each
+   new note cuts the highest held note; the bass keeps sounding. A note
+   above the whole chord does not sound.
+4. [ ] `stl none`: hold six notes; a seventh does not sound. Release one;
+   the next note sounds on the freed voice.
+5. [ ] In every mode, with fewer than six keys held, notes still go to
+   released voices first (release tails ring out as before).
+6. [ ] `3x unison` with `stl low`: hold two notes (both stacks busy); a
+   higher third note moves the whole lower stack, a lower one doesn't
+   sound.
+7. [ ] `cyclic` with `stl none`: still rotates through all voices, notes
+   are never refused.
+8. [ ] Optional, two Ambikas in `chain` (output mode `chain`), `stl none`:
+   with twelve notes held, a thirteenth goes to neither unit.
+9. [ ] Sustain pedal with `stl low`: hold the pedal, play a rising
+   arpeggio over more than six notes; the lowest notes drop out first, and
+   releasing the pedal releases everything (no hung notes).
+
+**Please send back:** whether refusing the out-of-priority note in Q2/Q3
+feels right while playing, or whether you'd rather have it steal anyway.

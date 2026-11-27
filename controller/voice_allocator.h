@@ -35,7 +35,9 @@ class VoiceAllocator {
     Clear();
   }
   
-  uint8_t NoteOn(uint8_t note);
+  // steal_mode is a StealMode (controller/part.h). Returns 0xff when the
+  // note is not played (no free voice, and the mode keeps the held notes).
+  uint8_t NoteOn(uint8_t note, uint8_t steal_mode = 0);
   uint8_t NoteOff(uint8_t note);
   uint8_t Find(uint8_t note) const;
   uint8_t FindActive(uint8_t note) const;

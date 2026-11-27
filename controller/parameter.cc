@@ -59,6 +59,7 @@ static const prog_uint16_t units_definitions[UNIT_LAST] PROGMEM = {
   STR_RES_THRU,       // UNIT_MIDI_OUT_MODE
   0,                  // UNIT_MIDI_CHANNEL
   STR_RES_STCK,       // UNIT_SPREAD_MODE
+  STR_RES_OLD,        // UNIT_STEAL_MODE
 };
 
 static const prog_char note_names[] PROGMEM = " CC# DD# E FF# GG# AA# B";
@@ -308,7 +309,7 @@ static const prog_char midi_cc_map[128] PROGMEM = {
    255, 255, 255, 255, 255, 255,  49,  50,
     51,  52,  53,  57,  73,  74,  75,  76,
    // 112-127
-    77,  78,  79, 255, 255, 255, 255, 255,
+    77,  78,  79,  80, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255
 };
 
@@ -350,7 +351,7 @@ static const prog_char midi_nrpn_map[256] PROGMEM = {
    254, 254, 254, 254, 254, 254, 254, 254,
    254, 254, 254, 254, 254, 254, 254, 254,
    // 192-207
-    79, 255, 255, 255, 255, 255, 255, 255,
+    79,  80, 255, 255, 255, 255, 255, 255,
    255, 255, 255, 255, 255, 255, 255, 255,
    // 208-223
    255, 255, 255, 255, 255, 255, 255, 255,
@@ -931,6 +932,13 @@ static const prog_Parameter parameters[kNumParameters] PROGMEM = {
     UNIT_SPREAD_MODE, SPREAD_MODE_STACK, SPREAD_MODE_LAST - 1,
     1, 0, 0xff, 114,
     STR_RES_SPRM, STR_RES_SPREAD_MODE, STR_RES_PART },
+  
+  // 80 (BAMBI): which held note a polyphonic part cuts for a new one.
+  { PARAMETER_LEVEL_PART,
+    PRM_PART_STEAL_MODE,
+    UNIT_STEAL_MODE, STEAL_OLDEST, STEAL_MODE_LAST - 1,
+    1, 0, 0xff, 115,
+    STR_RES_STL, STR_RES_VOICE_STEAL, STR_RES_PART },
 };
 
 /* static */
