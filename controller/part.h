@@ -61,6 +61,9 @@ enum PolyphonyMode {
   UNISON_2X,
   CYCLIC,
   CHAIN,
+  // YAM+: 3 and 4 voices per note.
+  UNISON_3X,
+  UNISON_4X,
   POLYPHONY_MODE_LAST
 };
 
@@ -202,6 +205,7 @@ enum SpreadMode {
   SPREAD_MODE_STACK,
   SPREAD_MODE_CENTER,
   SPREAD_MODE_WIDE,
+  SPREAD_MODE_SUB,
   SPREAD_MODE_LAST
 };
 
@@ -305,6 +309,11 @@ class Part {
   void InternalNoteOff(uint8_t note);
   
   uint8_t GetNextVoice(uint8_t voice_index) const;
+  // Voices per note: 2, 3 or 4 in the unison modes, 1 in the others.
+  uint8_t unison_size() const;
+  // Allocator slots played by local voicecards.
+  uint8_t local_slots() const;
+  uint8_t SlotVoices(uint8_t slot, uint8_t* count) const;
   
   Patch patch_;
   PartData data_;

@@ -246,8 +246,15 @@ void Part::InitializeAllocators() {
     mono_allocator_.Init();
   } else {
     uint8_t size = num_allocated_voices_;
-    if (data_.polyphony_mode == UNISON_2X) {
-      size = (num_allocated_voices_ + 1) >> 1;
+    uint8_t unison = unison_size();
+    if (unison > 1) {
+      // 2X keeps YAM's rounding up (with an odd number of voices, the last
+      // note shares a voice with the first). 3X and 4X round down so that
+      // a stack never steals from another; leftover voices stay silent.
+      size = (size + (unison == 2)) / unison;
+      if (num_allocated_voices_ && !size) {
+        size = 1;
+      }
     } else if (data_.polyphony_mode == CHAIN) {
       size <<= 1;
     }
@@ -486,42 +493,49 @@ uint8_t Part::GetNextVoice(uint8_t index) const {
   }
 }
 
+uint8_t Part::unison_size() const {
+  uint8_t mode = data_.polyphony_mode;
+  return mode == UNISON_2X ? 2 : (mode >= UNISON_3X ? mode - (UNISON_3X - 3) : 1);
+}
+
+uint8_t Part::local_slots() const {
+  uint8_t size = poly_allocator_.size();
+  // In CHAIN mode the allocator also tracks the notes forwarded down the
+  // chain (indices >= size / 2); they have no local voicecard.
+  if (data_.polyphony_mode == CHAIN) {
+    size >>= 1;
+  }
+  return size;
+}
+
+// Polyphonic modes (YAM+): voicecards playing allocator slot "slot". Returns
+// the index in allocated_voices_ of the first one, and their number in
+// *count: 1 in POLY / CYCLIC / CHAIN, the stack size in the unison modes
+// (fewer if the part has fewer voices), 0 if the slot has no local voice
+// (unused, or forwarded down the chain). The others follow with
+// GetNextVoice().
+uint8_t Part::SlotVoices(uint8_t slot, uint8_t* count) const {
+  uint8_t unison = unison_size();
+  uint8_t n = unison < num_allocated_voices_ ? unison : num_allocated_voices_;
+  *count = slot < local_slots() ? n : 0;
+  return slot * unison;
+}
+
 void Part::Aftertouch(uint8_t note, uint8_t velocity) {
-  if (data_.polyphony_mode == POLY ||
-      data_.polyphony_mode == CYCLIC ||
-      data_.polyphony_mode == CHAIN) {
-    // Send the aftertouch change to the voicecard playing the affected note.
-    uint8_t voice_index = poly_allocator_.Find(note);
-    uint8_t size = poly_allocator_.size();
-    // BAMBI fix: in CHAIN mode the allocator also tracks the notes forwarded
-    // down the chain (indices >= size / 2); they have no local voicecard.
-    // Stock YAM tested CYCLIC here, which indexed past allocated_voices_[]
-    // in CHAIN mode and starved half the voices in CYCLIC mode.
-    if (data_.polyphony_mode == CHAIN) {
-      size >>= 1;
-    }
-    if (voice_index < size) {
+  if (data_.polyphony_mode != MONO) {
+    // Send the aftertouch change to the voicecards playing the affected note.
+    // (BAMBI fix: stock YAM halved the allocator size for CYCLIC instead of
+    // CHAIN, which indexed past allocated_voices_[] in CHAIN mode and starved
+    // half the voices in CYCLIC mode.)
+    uint8_t count;
+    uint8_t voice_index = SlotVoices(poly_allocator_.Find(note), &count);
+    while (count--) {
       voicecard_tx.WriteData(
           allocated_voices_[voice_index],
           VOICECARD_DATA_MODULATION,
           MOD_SRC_AFTERTOUCH,
           velocity);
-    }
-  } else if (data_.polyphony_mode == UNISON_2X) {
-    // Send the aftertouch change to the voicecard playing the affected note.
-    uint8_t voice_index = poly_allocator_.Find(note);
-    if (voice_index < poly_allocator_.size()) {
-      voice_index <<= 1;
-      voicecard_tx.WriteData(
-          allocated_voices_[voice_index],
-          VOICECARD_DATA_MODULATION,
-          MOD_SRC_AFTERTOUCH,
-          velocity);
-      voicecard_tx.WriteData(
-          allocated_voices_[GetNextVoice(voice_index)],
-          VOICECARD_DATA_MODULATION,
-          MOD_SRC_AFTERTOUCH,
-          velocity);
+      voice_index = GetNextVoice(voice_index);
     }
   } else {
     // Process the message as if it were a global aftertouch message.
@@ -649,8 +663,23 @@ uint16_t Part::SpreadNote(
     uint8_t index,
     uint8_t count) const {
   uint8_t spread = data_.spread;
+  uint8_t spread_mode = data_.spread_mode;
   int16_t offset;
-  if (data_.spread_mode == SPREAD_MODE_STACK) {
+  if (spread_mode == SPREAD_MODE_SUB) {
+    // Stacked voices (mono or unison): the last voice of the stack plays one
+    // octave below the played pitch, the others spread as in CENTER. In the
+    // polyphonic modes this is just CENTER.
+    if (count >= 2 && (data_.polyphony_mode == MONO || unison_size() > 1)) {
+      --count;
+      if (index == count) {
+        index = 0;
+        count = 1;
+        note -= 12 * 128;
+      }
+    }
+    spread_mode = SPREAD_MODE_CENTER;
+  }
+  if (spread_mode == SPREAD_MODE_STACK) {
     offset = U8U8Mul(index, spread);
   } else if (count < 2) {
     offset = 0;
@@ -658,7 +687,7 @@ uint16_t Part::SpreadNote(
     // Position in half-voice units: -(count - 1) .. +(count - 1).
     int8_t position = (index << 1) - (count - 1);
     offset = static_cast<int16_t>(position) * spread;
-    if (data_.spread_mode == SPREAD_MODE_WIDE) {
+    if (spread_mode == SPREAD_MODE_WIDE) {
       offset = offset * (position < 0 ? -position : position) / (count - 1);
     }
     offset /= 2;
@@ -719,45 +748,28 @@ void Part::InternalNoteOn(uint8_t note, uint8_t velocity) {
     if (voice_index == 0xff) {
       voice_index = poly_allocator_.NoteOn(note);
     }
-    if (data_.polyphony_mode == UNISON_2X) {
-      if (voice_index < poly_allocator_.size()) {
-        voice_index <<= 1;
-        uint16_t tuned_note = TuneNote(note);
+    uint8_t count;
+    voice_index = SlotVoices(voice_index, &count);
+    if (count) {
+      uint16_t tuned_note = TuneNote(note);
+      // POLY / CYCLIC / CHAIN spread the voices by slot; unison spreads the
+      // voices of the stack.
+      uint8_t spread_count = count;
+      if (count == 1) {
+        spread_count = local_slots();
+      }
+      for (uint8_t i = 0; i < count; ++i) {
         voicecard_tx.Trigger(
             allocated_voices_[voice_index],
-            SpreadNote(tuned_note, 0, 2),
+            SpreadNote(tuned_note, count == 1 ? voice_index : i, spread_count),
             velocity,
             0);
-        voicecard_tx.Trigger(
-            allocated_voices_[GetNextVoice(voice_index)],
-            SpreadNote(tuned_note, 1, 2),
-            velocity,
-            0);
-        retrigger_lfos = 1;
+        voice_index = GetNextVoice(voice_index);
       }
     } else if (data_.polyphony_mode == CHAIN) {
-      if (voice_index < (poly_allocator_.size() >> 1)) {
-        uint16_t tuned_note = TuneNote(note);
-        voicecard_tx.Trigger(
-            allocated_voices_[voice_index],
-            SpreadNote(tuned_note, voice_index, poly_allocator_.size() >> 1),
-            velocity,
-            0);
-      } else {
-        midi_dispatcher.ForwardNote(this, note, velocity);
-      }
-      retrigger_lfos = 1;
-    } else {
-      if (voice_index < poly_allocator_.size()) {
-        uint16_t tuned_note = TuneNote(note);
-        voicecard_tx.Trigger(
-            allocated_voices_[voice_index],
-            SpreadNote(tuned_note, voice_index, poly_allocator_.size()),
-            velocity,
-            0);
-        retrigger_lfos = 1;
-      }
+      midi_dispatcher.ForwardNote(this, note, velocity);
     }
+    retrigger_lfos = 1;
   }
   
   // A note was played, we can retrigger the LFOs which are synced to the
@@ -798,23 +810,14 @@ void Part::InternalNoteOff(uint8_t note) {
       }
     }
   } else {
-    uint8_t voice_index = poly_allocator_.NoteOff(note);
-    if (data_.polyphony_mode == UNISON_2X) {
-      if (voice_index < poly_allocator_.size()) {
-        voice_index <<= 1;
-        voicecard_tx.Release(allocated_voices_[voice_index]);
-        voicecard_tx.Release(allocated_voices_[GetNextVoice(voice_index)]);
-      }
-    } else if (data_.polyphony_mode == CHAIN) {
-      if (voice_index < (poly_allocator_.size() >> 1)) {
-        voicecard_tx.Release(allocated_voices_[voice_index]);
-      } else {
-        midi_dispatcher.ForwardNote(this, note, 0);
-      }
-    } else {
-      if (voice_index < poly_allocator_.size()) {
-        voicecard_tx.Release(allocated_voices_[voice_index]);
-      }
+    uint8_t count;
+    uint8_t voice_index = SlotVoices(poly_allocator_.NoteOff(note), &count);
+    if (!count && data_.polyphony_mode == CHAIN) {
+      midi_dispatcher.ForwardNote(this, note, 0);
+    }
+    while (count--) {
+      voicecard_tx.Release(allocated_voices_[voice_index]);
+      voice_index = GetNextVoice(voice_index);
     }
   }
   if (retrigger_lfos) {

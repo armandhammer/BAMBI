@@ -37,8 +37,9 @@ const uint8_t kNumVoices = 6;
 const uint8_t kSystemVersion = 0x10;
 
 // YAM+ release, reported by the version SysEx request (0x1c): major in the
-// high nibble, minor in the low nibble.
-const uint8_t kYamPlusVersion = 0x01;
+// high nibble, minor in the low nibble. 0.2 adds the 3x/4x unison
+// polyphony modes (5, 6) and the "sub-" spread mode (3).
+const uint8_t kYamPlusVersion = 0x02;
 
 // Layout revisions of the patch and part data, reported by the version
 // request. 1 = YAM+ additions (patch bytes 106-109, part byte 80).
