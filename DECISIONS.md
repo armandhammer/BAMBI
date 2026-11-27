@@ -69,3 +69,29 @@ Newest last. Revisit any of them by opening an issue or reverting the commit.
   depends on the old amounts.
 - **Version numbers:** YAM+ 0.2 (`kYamPlusVersion` 0x02) and voicecard
   0x12, so editors can offer the new values only to firmware that has them.
+
+
+## 2026-11-26 — voice steal modes (YAM+ 0.3-dev)
+
+- **One part setting (`stl`, part byte 81) instead of separate "note
+  priority" and "stealing" settings.** In a polyphonic part both questions
+  have the same answer: the note that would lose its voice is the one with
+  the lowest priority. `low` / `high` name the note that gets stolen, so
+  the values fit the 4-character display.
+- **A new note that would itself be the victim is not played** (`low`: a
+  note below every held note; `high`: above). That is what high/low-note
+  priority means on monosynths; stealing anyway would make the setting
+  pointless for the case it exists for (a held chord under a melody).
+- **No "note return"**: a refused or stolen note whose key is still held
+  does not come back when a voice is released. It would need a held-note
+  list for the poly modes (the part's 12-note `pressed_keys_` stack is
+  already used by the arpeggiator) and more controller flash than is left
+  (560 B after this change, gate 512).
+- **`cyclic` ignores the setting**: its point is strict rotation (the
+  voice that sounds next is fixed), so it can't choose a victim.
+- **Released voices are still reused first in every mode**, so release
+  tails behave as before; the steal mode only matters with all voices held.
+- **CC 115** (next to spread mode's 114, undefined in the MIDI spec), NRPN
+  193, and SysEx part dumps carry it.
+- **Version numbers:** YAM+ 0.3 (`kYamPlusVersion` 0x03), part layout 2.
+  Cost: 146 B controller flash, no RAM.

@@ -298,6 +298,9 @@ static const prog_char str_res_cyclic[] PROGMEM = "cyclic";
 static const prog_char str_res_chain[] PROGMEM = "chain";
 static const prog_char str_res_3x_unison[] PROGMEM = "3x unison";
 static const prog_char str_res_4x_unison[] PROGMEM = "4x unison";
+static const prog_char str_res_stl[] PROGMEM = "stl";
+static const prog_char str_res_voice_steal[] PROGMEM = "voice steal";
+static const prog_char str_res_old[] PROGMEM = "old";
 static const prog_char str_res_up[] PROGMEM = "up";
 static const prog_char str_res_down[] PROGMEM = "down";
 static const prog_char str_res_up_down[] PROGMEM = "up&down";
@@ -697,6 +700,12 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_chain,
   str_res_3x_unison,
   str_res_4x_unison,
+  str_res_stl,
+  str_res_voice_steal,
+  str_res_old,
+  str_res_low,
+  str_res_high,
+  str_res_none,
   str_res_up,
   str_res_down,
   str_res_up_down,

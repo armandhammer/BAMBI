@@ -55,6 +55,23 @@ Like YAM's `2x unison` with three or four voices per note. With six voices,
 stay silent rather than steal half a stack). A part with fewer voices than
 the stack size stacks all of them. Spread and spread mode detune the stack.
 
+### Voice steal: `stl` (0.3; voice LFO page, top row, knob 1; part setting)
+Which held note a polyphonic part cuts when a new note finds every voice
+held. Released voices (still ringing out) are always reused first, as in
+YAM. Applies to `poly`, `chain` and the unison modes; `cyclic` keeps
+rotating and `mono` has no voices to steal.
+- `old`: YAM behaviour, the least recently played note. Existing parts load
+  as `old`.
+- `low`: the lowest held note (high-note priority: a melody played over a
+  held chord keeps sounding). A new note below every held note is not
+  played.
+- `high`: the highest held note (low-note priority: keeps the bass). A new
+  note above every held note is not played.
+- `none`: never steal. A new note is not played until a voice is released.
+
+A note that is not played is not forwarded down the chain either, and is
+not played later when a voice frees up.
+
 ### Faster editing
 - Encoder acceleration: turning quickly moves values ×2/×4 (page navigation
   is not accelerated). Shift(S1)+encoder ×8 still works.
@@ -80,6 +97,7 @@ the stack size stacks all of them. Spread and spread mode detune the stack.
 | vintage | 113 | 109 | 0–127 |
 | spread mode (part) | 114 | 192 | 0 stck, 1 cntr, 2 wide, 3 sub- (0.2) |
 | polyphony mode (part) | 107 | 127 | as YAM (0–4), 5 3x unison, 6 4x unison (0.2) |
+| voice steal (part) | 115 | 193 | 0 old, 1 low, 2 high, 3 none (0.3) |
 
 NRPN encoding as in YAM: NRPN MSB (CC99) = address bit 7, LSB (CC98) = address
 bits 0–6; data MSB (CC6) = value bit 7, LSB (CC38) = value bits 0–6.
@@ -94,7 +112,7 @@ payload (checksum `00 00`) unless noted.
 | `0x11`–`0x15` (dump patch/sequence/program/multi/part; arg = part, 0 = active) | `0x01`–`0x05`, **arg = part 1–6** (YAM: 0) | as YAM |
 | `0x16` name (arg = part; payload: 1 byte object 0 patch, 1 sequence, 2 program, 3 multi) | `0x06`, arg = part | object, bank (0 = A), slot, SD status (0 = ok), 16-char name |
 | `0x1a` current locations | `0x0a` | 19 little-endian words `bank << 8 \| slot`: part × 3 + {patch, sequence, program}, then multi |
-| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version (0x01 = 0.1, 0x02 = 0.2), oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
+| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version (0x01 = 0.1, 0x02 = 0.2, 0x03 = 0.3), oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
 
 `utils/yamplus_sysex.py` exercises these from a computer.
 
@@ -110,7 +128,8 @@ payload (checksum `00 00`) unless noted.
 | patch 109 | `vintage` |
 | patch 110–111 | spare |
 | part 80 (address 192) | `spread_mode` |
-| part 81–83 | spare |
+| part 81 (address 193) | `steal_mode` (0.3; part layout 2) |
+| part 82–83 | spare |
 
 ## Building
 
