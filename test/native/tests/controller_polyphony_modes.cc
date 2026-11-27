@@ -155,3 +155,238 @@ TEST(MonoModeTriggersAllVoicesLegato) {
   for (uint8_t v = 0; v < kNumVoices; ++v) voices += HasNoteOn(v);
   CHECK_EQ(voices, kNumVoices);
 }
+
+// --- YAM+ unison stacks (3X, 4X) and the "sub-" spread mode -----------------
+
+namespace {
+
+// Pitch (1/128 semitone) of the last note-on sent to |slave|, or -1.
+int LastNoteOnPitch(uint8_t slave) {
+  const std::vector<uint8_t>& b = native_env::VoicecardBytes(slave);
+  int pitch = -1;
+  for (size_t i = 0; i + 3 < b.size(); ++i) {
+    if (b[i] == COMMAND_NOTE_ON) {
+      pitch = b[i + 1] << 8 | b[i + 2];
+      i += 3;
+    }
+  }
+  return pitch;
+}
+
+bool HasRelease(uint8_t slave) {
+  const std::vector<uint8_t>& b = native_env::VoicecardBytes(slave);
+  for (size_t i = 0; i < b.size(); ++i) {
+    if (b[i] == COMMAND_RELEASE) return true;
+  }
+  return false;
+}
+
+int VoicesWithNoteOn() {
+  int voices = 0;
+  for (uint8_t v = 0; v < kNumVoices; ++v) voices += HasNoteOn(v);
+  return voices;
+}
+
+void SetSpread(uint8_t spread, uint8_t mode) {
+  native_env::Nrpn(0, PRM_PART_TUNING_SPREAD, spread);
+  native_env::Nrpn(0, PRM_PART_SPREAD_MODE, mode);
+  native_env::Run(4);
+  native_env::ClearSpi();
+}
+
+void SetAllocation(uint8_t mask) {
+  multi.mutable_data()->part_mapping_[0].voice_allocation = mask;
+  multi.AssignVoicesToParts();
+  native_env::Run(4);
+  native_env::ClearSpi();
+}
+
+}  // namespace
+
+TEST(PolyModeNrpnAcceptsUnison4xAndClampsAbove) {
+  SetUpPart(UNISON_4X);
+  CHECK_EQ(multi.part(0).data().polyphony_mode, UNISON_4X);
+  native_env::Nrpn(0, PRM_PART_POLYPHONY_MODE, 7);
+  native_env::Run(4);
+  CHECK(multi.part(0).data().polyphony_mode < POLYPHONY_MODE_LAST);
+}
+
+TEST(Unison3xStacksThreeVoicesPerNoteTwoNotes) {
+  SetUpPart(UNISON_3X);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::Run(8);
+  CHECK_EQ(VoicesWithNoteOn(), 3);
+  bool first[kNumVoices];
+  for (uint8_t v = 0; v < kNumVoices; ++v) first[v] = HasNoteOn(v);
+  native_env::ClearSpi();
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  CHECK_EQ(VoicesWithNoteOn(), 3);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    CHECK_MSG(!(first[v] && HasNoteOn(v)), "voice %d stolen by the 2nd note", v);
+  }
+}
+
+TEST(Unison3xThirdNoteStealsOneWholeStack) {
+  SetUpPart(UNISON_3X);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  native_env::ClearSpi();
+  native_env::MidiIn3(0x90, 67, 100);
+  native_env::Run(8);
+  CHECK_EQ(VoicesWithNoteOn(), 3);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    if (HasNoteOn(v)) CHECK_EQ(LastNoteOnPitch(v) >> 7, 67);
+  }
+}
+
+TEST(Unison3xNoteOffReleasesTheWholeStack) {
+  SetUpPart(UNISON_3X);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  bool on60[kNumVoices];
+  for (uint8_t v = 0; v < kNumVoices; ++v) on60[v] = LastNoteOnPitch(v) >> 7 == 60;
+  native_env::ClearSpi();
+  native_env::MidiIn3(0x80, 60, 0);
+  native_env::Run(8);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    CHECK_MSG(HasRelease(v) == on60[v], "voice %d release %d, playing 60 %d",
+              v, HasRelease(v), on60[v]);
+  }
+}
+
+TEST(Unison3xPolyAftertouchReachesTheStack) {
+  SetUpPart(UNISON_3X);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  bool on64[kNumVoices];
+  for (uint8_t v = 0; v < kNumVoices; ++v) on64[v] = LastNoteOnPitch(v) >> 7 == 64;
+  native_env::ClearSpi();
+  native_env::MidiIn3(0xa0, 64, 90);
+  native_env::Run(8);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    CHECK_EQ(AftertouchWrites(v), on64[v] ? 1 : 0);
+  }
+}
+
+TEST(Unison3xCenterSpreadIsSymmetric) {
+  SetUpPart(UNISON_3X);
+  SetSpread(20, SPREAD_MODE_CENTER);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::Run(8);
+  int lo = 0, mid = 0, hi = 0;
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    int p = LastNoteOnPitch(v);
+    lo += p == 60 * 128 - 20;
+    mid += p == 60 * 128;
+    hi += p == 60 * 128 + 20;
+  }
+  CHECK_EQ(lo, 1);
+  CHECK_EQ(mid, 1);
+  CHECK_EQ(hi, 1);
+}
+
+TEST(Unison4xUsesFourVoicesAndOneSlotOnSixVoices) {
+  SetUpPart(UNISON_4X);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::Run(8);
+  CHECK_EQ(VoicesWithNoteOn(), 4);
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  // Floor rounding: only one 4-voice stack fits, the 2nd note steals it and
+  // the two leftover voices never sound.
+  CHECK_EQ(VoicesWithNoteOn(), 4);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    if (HasNoteOn(v)) CHECK_EQ(LastNoteOnPitch(v) >> 7, 64);
+  }
+}
+
+TEST(Unison4xWithTwoVoicesStacksBoth) {
+  SetUpPart(UNISON_4X);
+  SetAllocation(0x03);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::Run(8);
+  CHECK(HasNoteOn(0));
+  CHECK(HasNoteOn(1));
+  CHECK_EQ(VoicesWithNoteOn(), 2);
+  native_env::ClearSpi();
+  native_env::MidiIn3(0x80, 60, 0);
+  native_env::Run(8);
+  CHECK(HasRelease(0));
+  CHECK(HasRelease(1));
+}
+
+TEST(Unison2xKeepsYamRoundingWithFiveVoices) {
+  // 5 voices: 3 slots, the 3rd note uses voices 4 and 0, as in YAM.
+  SetUpPart(UNISON_2X);
+  SetAllocation(0x1f);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::MidiIn3(0x90, 62, 100);
+  native_env::Run(8);
+  native_env::ClearSpi();
+  native_env::MidiIn3(0x90, 64, 100);
+  native_env::Run(8);
+  CHECK(HasNoteOn(4));
+  CHECK(HasNoteOn(0));
+  CHECK_EQ(VoicesWithNoteOn(), 2);
+}
+
+TEST(PartWithNoVoicesIgnoresUnisonNotes) {
+  SetUpPart(UNISON_3X);
+  SetAllocation(0);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::MidiIn3(0xa0, 60, 100);
+  native_env::MidiIn3(0x80, 60, 0);
+  native_env::Run(8);
+  for (uint8_t slave = 0; slave < 8; ++slave) {
+    CHECK_MSG(native_env::VoicecardBytes(slave).empty() ||
+              (!HasNoteOn(slave) && !HasRelease(slave)), "slave %d", slave);
+  }
+}
+
+TEST(SubSpreadDropsTheLastStackVoiceAnOctave) {
+  SetUpPart(UNISON_3X);
+  SetSpread(20, SPREAD_MODE_SUB);
+  native_env::MidiIn3(0x90, 60, 100);
+  native_env::Run(8);
+  int lo = 0, hi = 0, sub = 0;
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    int p = LastNoteOnPitch(v);
+    lo += p == 60 * 128 - 10;
+    hi += p == 60 * 128 + 10;
+    sub += p == 48 * 128;
+  }
+  CHECK_EQ(lo, 1);
+  CHECK_EQ(hi, 1);
+  CHECK_EQ(sub, 1);
+}
+
+TEST(SubSpreadInMonoModeAndLowNotesClampAtZero) {
+  SetUpPart(MONO);
+  SetSpread(0, SPREAD_MODE_SUB);
+  native_env::MidiIn3(0x90, 5, 100);
+  native_env::Run(8);
+  int zero = 0, five = 0;
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    int p = LastNoteOnPitch(v);
+    zero += p == 0;
+    five += p == 5 * 128;
+  }
+  CHECK_EQ(zero, 1);
+  CHECK_EQ(five, kNumVoices - 1);
+}
+
+TEST(SubSpreadIsCenterInPolyMode) {
+  SetUpPart(POLY);
+  SetSpread(20, SPREAD_MODE_SUB);
+  for (uint8_t n = 0; n < kNumVoices; ++n) native_env::MidiIn3(0x90, 60 + n, 100);
+  native_env::Run(8);
+  CHECK_EQ(VoicesWithNoteOn(), kNumVoices);
+  for (uint8_t v = 0; v < kNumVoices; ++v) {
+    int p = LastNoteOnPitch(v);
+    CHECK_MSG(p > 59 * 128 && p < 66 * 128, "voice %d pitch %d", v, p);
+  }
+}

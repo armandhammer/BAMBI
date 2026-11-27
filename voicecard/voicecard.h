@@ -33,8 +33,9 @@ static const uint8_t kControlRate = 40;
 static const uint8_t kAudioBlockSize = kControlRate;
 
 // 0x11 = YAM+ voicecard (CV smoothing, envelope curves, vintage, load probe,
-// commands 0x9n/0xf6/0xf7/0xfe). Stock YAM voicecards report 0x10.
-const uint8_t kSystemVersion = 0x11;
+// commands 0x9n/0xf6/0xf7/0xfe). 0x12 = YAM+ 0.2 (vintage: per-note slop,
+// oscillator 2 drift, resonance tolerance). Stock YAM voicecards report 0x10.
+const uint8_t kSystemVersion = 0x12;
 
 static uint8_t* kFirmwareUpdateFlagPtr = (uint8_t*)(E2END);
 

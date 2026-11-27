@@ -198,3 +198,59 @@ The voicecard now writes incoming patch bytes straight into its patch
 
 **Please send back:** anything that sounds different from YAM+ 0.1 in
 I, K or M.
+
+---
+
+## BAMBI 0.2-dev: unison stacks and vintage expansion
+
+Flash the controller *and* all six voicecards. The OS-info page shows
+`YAMplus v0.2`; voicecards report `v1.2`. Use part 1 with all six voices
+and a simple saw patch (osc 2 off) unless a step says otherwise.
+
+### N. Unison stacks (10 min)
+1. [ ] Polyphony mode now offers `3x unison` and `4x unison` after `chain`.
+2. [ ] `3x unison`, spread mode `cntr`, spread 10: one note sounds on three
+   voicecards (watch the LEDs), with a thick, centred chorus. A second note
+   uses the other three. A third note steals the oldest stack (all three
+   voices move together).
+3. [ ] Releasing a note releases all three of its voices; nothing hangs
+   after fast playing (hold the sustain pedal, mash keys, release).
+4. [ ] `4x unison`: one note uses four voicecards; a second note steals
+   them (voices 5 and 6 stay silent; that's intended with six voices).
+5. [ ] Give part 1 only two voices: `4x unison` stacks both.
+6. [ ] `2x unison` still behaves as in YAM (three notes on six voices).
+7. [ ] Poly aftertouch (if your keyboard has it) routed to cutoff: in
+   `3x unison`, pressing harder on one key moves all three voices of that
+   note and no others.
+
+### O. Spread mode `sub-` (5 min)
+8. [ ] Spread mode `sub-` (after `wide`), `3x unison`, spread 10: two
+   voices spread around the played pitch and the third plays one octave
+   lower. In `mono` with six voices: five spread voices plus one sub voice.
+9. [ ] In `poly`, `sub-` sounds exactly like `cntr` (no octave drop).
+10. [ ] Play the lowest notes: the sub voice bottoms out at C-1 instead of
+    wrapping to a high pitch.
+
+### P. Vintage expansion (15 min)
+`vint` now also adds per-note pitch slop, a separate slow drift on
+oscillator 2, and a per-voice resonance offset. `vint 0` must be exactly
+YAM.
+11. [ ] `vint 0`: the patch sounds identical to YAM+ 0.1 / stock YAM.
+12. [ ] `vint 127`, osc 2 saw at the same pitch as osc 1, detune 0: hold one
+    note for 10 s. You hear a slow, irregular beating between the two
+    oscillators (osc 2 drift, up to about 6 cents).
+13. [ ] `vint 127`, osc 2 off: repeat the same key quickly (staccato). Each
+    note starts at a slightly different pitch (within about 6 cents of the
+    previous one); legato notes in mono mode keep the pitch.
+14. [ ] `vint 127`, resonance around 40, cutoff low, `poly`: play the same
+    note on each voice in turn (cyclic mode helps). Each voice's
+    resonance peak is a little different, more noticeable on some
+    filter boards than others.
+15. [ ] `vint 127`, attack around 70: repeated notes have slightly
+    different attack times (the swell doesn't line up exactly).
+16. [ ] OS-info page, each voicecard: the `ld` peak load stays below 90%
+    with `vint 127` and a busy patch (both oscillators, sub, noise, fuzz).
+    Note the values you see.
+
+**Please send back:** the `ld` readings from P16, and whether the vintage
+amounts in P12–P15 feel too subtle, right, or too strong at 127.

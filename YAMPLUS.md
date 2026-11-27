@@ -31,6 +31,12 @@ small pitch, cutoff and envelope-time offsets, plus a slow, independent
 drift. At 127: up to about ±15 cents and ±5 cutoff steps per voice. Try
 20–50 for a subtle, living poly sound.
 
+*Since 0.2:* vintage also adds per-note slop (each new note starts up to
+±6 cents and −2…+1 envelope-time steps off, like an old poly from note to
+note), a separate slow drift on oscillator 2 (up to ±6 cents against
+oscillator 1, so the two beat), and a per-voice resonance offset (up to ±2
+steps). Still exactly YAM at 0.
+
 ### Spread mode: `sprm` (voice LFO page, top row, knob 4; part setting)
 How the part's `spread` detunes stacked or allocated voices:
 - `stck`: YAM behaviour. Voice *n* is raised by *n* × spread, so big mono
@@ -39,6 +45,15 @@ How the part's `spread` detunes stacked or allocated voices:
   default to this).
 - `wide`: symmetric, with inner voices closer to the center and outer voices
   at the same extremes (supersaw-like).
+- `sub-` (0.2): in `mono` and the unison modes, the last voice of the stack
+  plays one octave below the played pitch and the others spread as in
+  `cntr`. In the polyphonic modes it is the same as `cntr`.
+
+### Unison stacks: `3x unison`, `4x unison` (0.2; part polyphony mode)
+Like YAM's `2x unison` with three or four voices per note. With six voices,
+`3x unison` plays two notes and `4x unison` one (the two leftover voices
+stay silent rather than steal half a stack). A part with fewer voices than
+the stack size stacks all of them. Spread and spread mode detune the stack.
 
 ### Faster editing
 - Encoder acceleration: turning quickly moves values ×2/×4 (page navigation
@@ -63,7 +78,8 @@ How the part's `spread` detunes stacked or allocated voices:
 |---|---|---|---|
 | env1/2/3 curve | 110 / 111 / 112 | 106 / 107 / 108 | 0–127 |
 | vintage | 113 | 109 | 0–127 |
-| spread mode (part) | 114 | 192 | 0 stck, 1 cntr, 2 wide |
+| spread mode (part) | 114 | 192 | 0 stck, 1 cntr, 2 wide, 3 sub- (0.2) |
+| polyphony mode (part) | 107 | 127 | as YAM (0–4), 5 3x unison, 6 4x unison (0.2) |
 
 NRPN encoding as in YAM: NRPN MSB (CC99) = address bit 7, LSB (CC98) = address
 bits 0–6; data MSB (CC6) = value bit 7, LSB (CC38) = value bits 0–6.
@@ -78,7 +94,7 @@ payload (checksum `00 00`) unless noted.
 | `0x11`–`0x15` (dump patch/sequence/program/multi/part; arg = part, 0 = active) | `0x01`–`0x05`, **arg = part 1–6** (YAM: 0) | as YAM |
 | `0x16` name (arg = part; payload: 1 byte object 0 patch, 1 sequence, 2 program, 3 multi) | `0x06`, arg = part | object, bank (0 = A), slot, SD status (0 = ok), 16-char name |
 | `0x1a` current locations | `0x0a` | 19 little-endian words `bank << 8 \| slot`: part × 3 + {patch, sequence, program}, then multi |
-| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version, oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
+| `0x1c` version | `0x0c` | family (1 = YAM+), controller version, YAM+ version (0x01 = 0.1, 0x02 = 0.2), oscillator shape count, patch layout, part layout, then per voicecard port: slave id, version |
 
 `utils/yamplus_sysex.py` exercises these from a computer.
 

@@ -109,6 +109,9 @@ class Voice {
   // YAM+: index of the voicecard slot (0-5), assigned by the controller.
   // Selects the per-voice vintage offsets and seeds the drift generator.
   static void set_voice_index(uint8_t index);
+  // YAM+ vintage pitch offset of oscillator |osc| (1/128 semitone) in the
+  // last block. For the native tests; not linked into the firmware.
+  static int16_t debug_vintage_pitch(uint8_t osc);
 
  private:
   static inline void LoadSources() __attribute__((always_inline));

@@ -54,6 +54,7 @@ static const prog_char str_res_spread_mode[] PROGMEM = "spread mode";
 static const prog_char str_res_stck[] PROGMEM = "stck";
 static const prog_char str_res_cntr[] PROGMEM = "cntr";
 static const prog_char str_res_wide[] PROGMEM = "wide";
+static const prog_char str_res_sub[] PROGMEM = "sub-";
 static const prog_char str_res_attack[] PROGMEM = "attack";
 static const prog_char str_res_decay[] PROGMEM = "decay";
 static const prog_char str_res_sustain[] PROGMEM = "sustain";
@@ -230,7 +231,7 @@ static const prog_char str_res_31S2[] PROGMEM = "1+2";
 static const prog_char str_res_vibr[] PROGMEM = "vibr";
 static const prog_char str_res_mix[] PROGMEM = "mix";
 static const prog_char str_res_xmod[] PROGMEM = "xmod";
-static const prog_char str_res_sub[] PROGMEM = "sub";
+static const prog_char str_res__sub[] PROGMEM = "sub";
 static const prog_char str_res_fuzz[] PROGMEM = "fuzz";
 static const prog_char str_res_crsh[] PROGMEM = "crsh";
 static const prog_char str_res_freq[] PROGMEM = "freq";
@@ -295,6 +296,8 @@ static const prog_char str_res_poly[] PROGMEM = "poly";
 static const prog_char str_res_2x_unison[] PROGMEM = "2x unison";
 static const prog_char str_res_cyclic[] PROGMEM = "cyclic";
 static const prog_char str_res_chain[] PROGMEM = "chain";
+static const prog_char str_res_3x_unison[] PROGMEM = "3x unison";
+static const prog_char str_res_4x_unison[] PROGMEM = "4x unison";
 static const prog_char str_res_up[] PROGMEM = "up";
 static const prog_char str_res_down[] PROGMEM = "down";
 static const prog_char str_res_up_down[] PROGMEM = "up&down";
@@ -427,6 +430,7 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_stck,
   str_res_cntr,
   str_res_wide,
+  str_res_sub,
   str_res_attack,
   str_res_decay,
   str_res_sustain,
@@ -607,7 +611,7 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_mix,
   str_res_xmod,
   str_res_nois,
-  str_res_sub,
+  str_res__sub,
   str_res_fuzz,
   str_res_crsh,
   str_res_freq,
@@ -691,6 +695,8 @@ PROGMEM const prog_char* const string_table[] = {
   str_res_2x_unison,
   str_res_cyclic,
   str_res_chain,
+  str_res_3x_unison,
+  str_res_4x_unison,
   str_res_up,
   str_res_down,
   str_res_up_down,

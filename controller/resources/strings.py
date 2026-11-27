@@ -49,6 +49,7 @@ spread mode
 stck
 cntr
 wide
+sub-
 attack
 decay
 sustain
@@ -327,6 +328,8 @@ poly
 2x unison
 cyclic
 chain
+3x unison
+4x unison
 
 up
 down
